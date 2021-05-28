@@ -5,6 +5,7 @@ use itertools::Itertools;
 // use bytes::Bytes;
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::fmt;
 use std::fs;
 use std::iter::Iterator;
 
@@ -12,11 +13,21 @@ mod instructions;
 
 use crate::instructions::*;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 enum VMError {
     UNDERFLOW,
     BADOP(u8),
     BADARG,
+}
+
+impl fmt::Debug for VMError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VMError::UNDERFLOW => write!(f, "UNDERFLOW"),
+            VMError::BADOP(op) => write!(f, "BADOP(0x{:02x})", op),
+            VMError::BADARG => write!(f, "BADARG"),
+        }
+    }
 }
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
@@ -69,14 +80,24 @@ struct Stack {
 //     Ok(())
 // }
 
-// #[derive(Default)]
-// struct Parser {
-//     pub input: Bytes,
-// }
+trait EndianRead {
+    type Array;
+    fn from_be_slice(bytes: &[u8]) -> Self;
+}
 
-// impl Parser {
-//     fn read_op_code(&self) -> Instruction::new(}
-// }
+macro_rules! impl_EndianRead_for_ints (( $($int:ident),* ) => {
+    $(
+        impl EndianRead for $int {
+            type Array = [u8; std::mem::size_of::<Self>()];
+            fn from_be_slice(bytes: &[u8]) -> Self {
+                let array = bytes.try_into().unwrap();
+                Self::from_be_bytes(array)
+            }
+        }
+    )*
+});
+
+impl_EndianRead_for_ints!(u8, u16, u32, u64, u128);
 
 struct InputManager {
     ops: Vec<u8>,
@@ -104,15 +125,13 @@ impl InputManager {
         }
     }
 
-    fn take_u16(&mut self) -> Result<u16, VMError> {
-        let size = std::mem::size_of::<u16>();
+    fn take<T: EndianRead>(&mut self) -> Result<T, VMError> {
+        let size = std::mem::size_of::<T>();
         let end = self.index + size;
         if end <= self.ops.len() {
             let bytes = &self.ops[self.index..end];
             self.index += size;
-            Ok(u16::from_be_bytes(
-                bytes.try_into().map_err(|_| VMError::BADARG)?,
-            ))
+            Ok(T::from_be_slice(bytes))
         } else {
             Err(VMError::BADARG)
         }
@@ -125,8 +144,11 @@ impl InputManager {
     fn take_arg(&mut self, arg_type: ArgType) -> Result<ArgValue, VMError> {
         Ok(match arg_type {
             ArgType::Void => ArgValue::Void,
-            ArgType::U8 => ArgValue::U8(self.take_u8()?),
-            ArgType::U16 => ArgValue::U16(self.take_u16()?),
+            ArgType::U8 => ArgValue::U8(self.take::<u8>()?),
+            ArgType::U16 => ArgValue::U16(self.take::<u16>()?),
+            ArgType::U32 => ArgValue::U32(self.take::<u32>()?),
+            ArgType::U64 => ArgValue::U64(self.take::<u64>()?),
+            ArgType::U128 => ArgValue::U128(self.take::<u128>()?),
         })
     }
 }
@@ -141,18 +163,6 @@ fn dissemble(input: &mut InputManager) -> Result<(), VMError> {
         let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
         let arg = input.take_arg(inst.arg)?;
         println!("{:02x}: {} {}", inst.op, inst.name, arg);
-        // 00  NAME
-        // 01  ??
-        // 02  PUSH1 ARG
-
-        // match op {
-        //     OP_ADD => println!("{:02x}: ADD", op),
-        //     OP_PUSH1 => {
-        //         let arg = take().unwrap(); // TODO: Handle overflow.
-        //         println!("{:02x}: PUSH1 ({:02x})", op, arg);
-        //     }
-        //     _ => println!("{:02x}: ??", op),
-        // }
     }
 
     Ok(())

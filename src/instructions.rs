@@ -7,6 +7,9 @@ pub enum ArgType {
     Void,
     U8,
     U16,
+    U32,
+    U64,
+    U128,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -14,6 +17,9 @@ pub enum ArgValue {
     Void,
     U8(u8),
     U16(u16),
+    U32(u32),
+    U64(u64),
+    U128(u128),
 }
 
 impl fmt::Display for ArgValue {
@@ -24,6 +30,15 @@ impl fmt::Display for ArgValue {
                 write!(f, "({})", value)
             }
             ArgValue::U16(value) => {
+                write!(f, "({})", value)
+            }
+            ArgValue::U32(value) => {
+                write!(f, "({})", value)
+            }
+            ArgValue::U64(value) => {
+                write!(f, "({})", value)
+            }
+            ArgValue::U128(value) => {
                 write!(f, "({})", value)
             }
         }
@@ -74,6 +89,9 @@ pub const OP_OR: Instruction = Instruction { op: 0x17, name: "OR", arg: ArgType:
 pub const OP_XOR: Instruction = Instruction { op: 0x18, name: "XOR", arg: ArgType::Void };
 pub const OP_NOT: Instruction = Instruction { op: 0x19, name: "NOT", arg: ArgType::Void };
 pub const OP_BYTE: Instruction = Instruction { op: 0x1a, name: "BYTE", arg: ArgType::Void };
+pub const OP_SHL: Instruction = Instruction { op: 0x1b, name: "SHL", arg: ArgType::Void };
+pub const OP_SHR: Instruction = Instruction { op: 0x1c, name: "SHR", arg: ArgType::Void };
+pub const OP_SAR: Instruction = Instruction { op: 0x1d, name: "SAR", arg: ArgType::Void };
 pub const OP_SHA3: Instruction = Instruction { op: 0x20, name: "SHA3", arg: ArgType::Void };
 pub const OP_ADDRESS: Instruction = Instruction { op: 0x30, name: "ADDRESS", arg: ArgType::Void };
 pub const OP_BALANCE: Instruction = Instruction { op: 0x31, name: "BALANCE", arg: ArgType::Void };
@@ -107,10 +125,46 @@ pub const OP_MSIZE: Instruction = Instruction { op: 0x59, name: "MSIZE", arg: Ar
 pub const OP_GAS: Instruction = Instruction { op: 0x5a, name: "GAS", arg: ArgType::Void };
 pub const OP_JUMPDEST: Instruction = Instruction { op: 0x5b, name: "JUMPDEST", arg: ArgType::Void };
 pub const OP_PUSH1: Instruction = Instruction { op: 0x60, name: "PUSH1", arg: ArgType::U8 };
-// 0x60 -- 0x7f	PUSH*
-pub const OP_DUP: Instruction = Instruction { op: 0x80, name: "DUP", arg: ArgType::Void };
-// 0x80 -- 0x8f	DUP*
-// 0x90 -- 0x9f	SWAP*
+pub const OP_PUSH2: Instruction = Instruction { op: 0x61, name: "PUSH2", arg: ArgType::U16 };
+// pub const OP_PUSH3: Instruction = Instruction { op: 0x62, name: "PUSH3", arg: ArgType::U24 };
+pub const OP_PUSH4: Instruction = Instruction { op: 0x63, name: "PUSH4", arg: ArgType::U32 };
+// pub const OP_PUSH5: Instruction = Instruction { op: 0x64, name: "PUSH5", arg: ArgType::U40 };
+// pub const OP_PUSH6: Instruction = Instruction { op: 0x65, name: "PUSH6", arg: ArgType::U48 };
+// pub const OP_PUSH7: Instruction = Instruction { op: 0x66, name: "PUSH7", arg: ArgType::U56 };
+pub const OP_PUSH8: Instruction = Instruction { op: 0x67, name: "PUSH8", arg: ArgType::U64 };
+pub const OP_PUSH16: Instruction = Instruction { op: 0x6F, name: "PUSH16", arg: ArgType::U128 };
+pub const OP_DUP1: Instruction = Instruction { op: 0x80, name: "DUP1", arg: ArgType::Void };
+pub const OP_DUP2: Instruction = Instruction { op: 0x81, name: "DUP2", arg: ArgType::Void };
+pub const OP_DUP3: Instruction = Instruction { op: 0x82, name: "DUP3", arg: ArgType::Void };
+pub const OP_DUP4: Instruction = Instruction { op: 0x83, name: "DUP4", arg: ArgType::Void };
+pub const OP_DUP5: Instruction = Instruction { op: 0x84, name: "DUP5", arg: ArgType::Void };
+pub const OP_DUP6: Instruction = Instruction { op: 0x85, name: "DUP6", arg: ArgType::Void };
+pub const OP_DUP7: Instruction = Instruction { op: 0x86, name: "DUP7", arg: ArgType::Void };
+pub const OP_DUP8: Instruction = Instruction { op: 0x87, name: "DUP8", arg: ArgType::Void };
+pub const OP_DUP9: Instruction = Instruction { op: 0x88, name: "DUP9", arg: ArgType::Void };
+pub const OP_DUP10: Instruction = Instruction { op: 0x89, name: "DUP10", arg: ArgType::Void };
+pub const OP_DUP11: Instruction = Instruction { op: 0x8A, name: "DUP11", arg: ArgType::Void };
+pub const OP_DUP12: Instruction = Instruction { op: 0x8B, name: "DUP12", arg: ArgType::Void };
+pub const OP_DUP13: Instruction = Instruction { op: 0x8C, name: "DUP13", arg: ArgType::Void };
+pub const OP_DUP14: Instruction = Instruction { op: 0x8D, name: "DUP14", arg: ArgType::Void };
+pub const OP_DUP15: Instruction = Instruction { op: 0x8E, name: "DUP15", arg: ArgType::Void };
+pub const OP_DUP16: Instruction = Instruction { op: 0x8F, name: "DUP16", arg: ArgType::Void };
+pub const OP_SWAP1: Instruction = Instruction { op: 0x90, name: "SWAP1", arg: ArgType::Void };
+pub const OP_SWAP2: Instruction = Instruction { op: 0x91, name: "SWAP2", arg: ArgType::Void };
+pub const OP_SWAP3: Instruction = Instruction { op: 0x92, name: "SWAP3", arg: ArgType::Void };
+pub const OP_SWAP4: Instruction = Instruction { op: 0x93, name: "SWAP4", arg: ArgType::Void };
+pub const OP_SWAP5: Instruction = Instruction { op: 0x94, name: "SWAP5", arg: ArgType::Void };
+pub const OP_SWAP6: Instruction = Instruction { op: 0x95, name: "SWAP6", arg: ArgType::Void };
+pub const OP_SWAP7: Instruction = Instruction { op: 0x96, name: "SWAP7", arg: ArgType::Void };
+pub const OP_SWAP8: Instruction = Instruction { op: 0x97, name: "SWAP8", arg: ArgType::Void };
+pub const OP_SWAP9: Instruction = Instruction { op: 0x98, name: "SWAP9", arg: ArgType::Void };
+pub const OP_SWAP10: Instruction = Instruction { op: 0x99, name: "SWAP10", arg: ArgType::Void };
+pub const OP_SWAP11: Instruction = Instruction { op: 0x9A, name: "SWAP11", arg: ArgType::Void };
+pub const OP_SWAP12: Instruction = Instruction { op: 0x9B, name: "SWAP12", arg: ArgType::Void };
+pub const OP_SWAP13: Instruction = Instruction { op: 0x9C, name: "SWAP13", arg: ArgType::Void };
+pub const OP_SWAP14: Instruction = Instruction { op: 0x9D, name: "SWAP14", arg: ArgType::Void };
+pub const OP_SWAP15: Instruction = Instruction { op: 0x9E, name: "SWAP15", arg: ArgType::Void };
+pub const OP_SWAP16: Instruction = Instruction { op: 0x9F, name: "SWAP16", arg: ArgType::Void };
 pub const OP_LOG0: Instruction = Instruction { op: 0xa0, name: "LOG0", arg: ArgType::Void };
 pub const OP_LOG1: Instruction = Instruction { op: 0xa1, name: "LOG1", arg: ArgType::Void };
 pub const OP_LOG2: Instruction = Instruction { op: 0xa2, name: "LOG2", arg: ArgType::Void };
@@ -121,10 +175,11 @@ pub const OP_CALL: Instruction = Instruction { op: 0xf1, name: "CALL", arg: ArgT
 pub const OP_CALLCODE: Instruction = Instruction { op: 0xf2, name: "CALLCODE", arg: ArgType::Void };
 pub const OP_RETURN: Instruction = Instruction { op: 0xf3, name: "RETURN", arg: ArgType::Void };
 pub const OP_DELEGATECALL: Instruction = Instruction { op: 0xf4, name: "DELEGATECALL", arg: ArgType::Void };
+pub const OP_REVERT: Instruction = Instruction { op: 0xfd, name: "REVERT", arg: ArgType::Void };
 pub const OP_INVALID: Instruction = Instruction { op: 0xfe, name: "INVALID", arg: ArgType::Void };
 pub const OP_SELFDESTRUCT: Instruction = Instruction { op: 0xff, name: "SELFDESTRUCT", arg: ArgType::Void };
 
-pub const INSTRUCTIONS: [Instruction; 69] = [
+pub const INSTRUCTIONS: [Instruction; 108] = [
     OP_STOP,
     OP_ADD,
     OP_MUL,
@@ -148,6 +203,9 @@ pub const INSTRUCTIONS: [Instruction; 69] = [
     OP_XOR,
     OP_NOT,
     OP_BYTE,
+    OP_SHL,
+    OP_SHR,
+    OP_SAR,
     OP_SHA3,
     OP_ADDRESS,
     OP_BALANCE,
@@ -181,10 +239,42 @@ pub const INSTRUCTIONS: [Instruction; 69] = [
     OP_GAS,
     OP_JUMPDEST,
     OP_PUSH1,
-    // OP_PUSH*,
-    OP_DUP,
-    // OP_DUP*,
-    // OP_SWAP*,
+    OP_PUSH2,
+    OP_PUSH4,
+    OP_PUSH8,
+    OP_PUSH16,
+    OP_DUP1,
+    OP_DUP2,
+    OP_DUP3,
+    OP_DUP4,
+    OP_DUP5,
+    OP_DUP6,
+    OP_DUP7,
+    OP_DUP8,
+    OP_DUP9,
+    OP_DUP10,
+    OP_DUP11,
+    OP_DUP12,
+    OP_DUP13,
+    OP_DUP14,
+    OP_DUP15,
+    OP_DUP16,
+    OP_SWAP1,
+    OP_SWAP2,
+    OP_SWAP3,
+    OP_SWAP4,
+    OP_SWAP5,
+    OP_SWAP6,
+    OP_SWAP7,
+    OP_SWAP8,
+    OP_SWAP9,
+    OP_SWAP10,
+    OP_SWAP11,
+    OP_SWAP12,
+    OP_SWAP13,
+    OP_SWAP14,
+    OP_SWAP15,
+    OP_SWAP16,
     OP_LOG0,
     OP_LOG1,
     OP_LOG2,
@@ -195,6 +285,7 @@ pub const INSTRUCTIONS: [Instruction; 69] = [
     OP_CALLCODE,
     OP_RETURN,
     OP_DELEGATECALL,
+    OP_REVERT,
     OP_INVALID,
     OP_SELFDESTRUCT,
 ];
