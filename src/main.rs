@@ -46,6 +46,14 @@ impl Stack {
         return self.values.push(value);
     }
 
+    fn peek(&self, index: usize) -> Result<UInt256, VMError> {
+        if index < self.values.len() {
+            Ok(self.values[self.values.len() - index - 1])
+        } else {
+            Err(VMError::UNDERFLOW)
+        }
+    }
+
     fn pop(&mut self) -> Result<UInt256, VMError> {
         return self.values.pop().ok_or(VMError::UNDERFLOW);
     }
@@ -57,9 +65,27 @@ struct Memory {
 }
 
 #[derive(Default)]
-struct EVM {
+struct Message {
+    value: UInt256,
+    caller: UInt256,
+    data: Vec<UInt256>,
+}
+
+#[derive(Default)]
+struct Task {
+    message: Message, // This ends up being a stack I think?
     stack: Stack,
     memory: Memory,
+    input: InputManager,
+}
+
+impl Task {
+    fn new(input: InputManager) -> Task {
+        Task {
+            input: input,
+            ..Task::default()
+        }
+    }
 }
 
 impl Memory {
@@ -75,7 +101,7 @@ impl Memory {
     }
 }
 
-impl EVM {
+impl Task {
     fn execute_single_instruction(
         &mut self,
         instruction: &Instruction,
@@ -93,6 +119,26 @@ impl EVM {
                 let value = stack.pop()?;
                 self.memory.store(offset, value)?;
             }
+            OP_CALLVALUE => {
+                stack.push(self.message.value);
+            }
+            OP_DUP1 => {
+                stack.push(stack.peek(0)?);
+            }
+            OP_ISZERO => {
+                if stack.peek(0)? == UInt256::ZERO {
+                    stack.push(UInt256::ONE)
+                } else {
+                    stack.push(UInt256::ZERO)
+                }
+            }
+            OP_JUMPI => {
+                let destination = stack.pop()?;
+                let condition = stack.pop()?;
+                if condition == UInt256::ZERO {
+                    self.input.index = destination.try_into().map_err(|_| VMError::UNDERFLOW)?;
+                }
+            }
             // All push instructions:
             Instruction {
                 op: 0x60..=0x7F, ..
@@ -106,20 +152,21 @@ impl EVM {
         }
         Ok(())
     }
-    fn execute_instruction_stream(&mut self, input: &mut InputManager) -> Result<(), VMError> {
+    fn execute(&mut self) -> Result<(), VMError> {
         let ops: HashMap<_, _> = INSTRUCTIONS
             .iter()
             .map(|instruction| (instruction.op, instruction))
             .collect();
-        while let Some(op) = input.take_op() {
+        while let Some(op) = self.input.take_op() {
             let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
-            let arg_option = input.take_arg(inst.arg)?;
+            let arg_option = self.input.take_arg(inst.arg)?;
             self.execute_single_instruction(inst, arg_option)?;
         }
         Ok(())
     }
 }
 
+#[derive(Default)]
 struct InputManager {
     ops: Vec<u8>,
     index: usize,
@@ -217,17 +264,17 @@ fn main_execute() {
     let filename = "bin/fixtures/Counter.bin";
     println!("In file {}", filename);
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
-    let mut input = InputManager::new(&contents);
+    let input = InputManager::new(&contents);
 
     // let instructions: Vec<u8> = vec![OP_PUSH1.op, 1, OP_PUSH1.op, 2, OP_ADD.op];
-    // let mut input = InputManager {
+    // let input = InputManager {
     //     ops: instructions,
     //     index: 0,
     // };
 
-    let mut vm = EVM::default();
-    match vm.execute_instruction_stream(&mut input) {
-        Ok(()) => println!("DONE: {:?}", vm.stack.values),
+    let mut task = Task::new(input);
+    match task.execute() {
+        Ok(()) => println!("DONE: {:?}", task.stack.values),
         Err(error) => println!("ERROR: {:?}", error),
     }
 }

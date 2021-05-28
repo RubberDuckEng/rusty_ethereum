@@ -9,6 +9,11 @@ pub struct UInt256 {
     low: u128,
 }
 
+impl UInt256 {
+    pub const ONE: UInt256 = UInt256 { high: 0, low: 1 };
+    pub const ZERO: UInt256 = UInt256 { high: 0, low: 0 };
+}
+
 impl Add for UInt256 {
     type Output = Self;
 
