@@ -4,6 +4,7 @@ use itertools::Itertools;
 
 // use bytes::Bytes;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::fmt;
 use std::fs;
 use std::iter::Iterator;
@@ -51,8 +52,27 @@ impl Stack {
 }
 
 #[derive(Default)]
+struct Memory {
+    storage: Vec<u8>,
+}
+
+#[derive(Default)]
 struct EVM {
     stack: Stack,
+    memory: Memory,
+}
+
+impl Memory {
+    fn store(&mut self, offset: UInt256, value: UInt256) -> Result<(), VMError> {
+        let index: usize = offset.try_into().map_err(|_| VMError::UNDERFLOW)?;
+        let end = index + 32;
+        if end > self.storage.len() {
+            self.storage.resize(end, 0);
+        }
+
+        value.to_be_bytes(&mut self.storage[index..end]);
+        Ok(())
+    }
 }
 
 impl EVM {
@@ -67,6 +87,11 @@ impl EVM {
             OP_ADD => {
                 let result = stack.pop()? + stack.pop()?;
                 stack.push(result);
+            }
+            OP_MSTORE => {
+                let offset = stack.pop()?;
+                let value = stack.pop()?;
+                self.memory.store(offset, value)?;
             }
             // All push instructions:
             Instruction {
