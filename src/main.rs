@@ -24,7 +24,7 @@ impl fmt::Debug for VMError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             VMError::UNDERFLOW => write!(f, "UNDERFLOW"),
-            VMError::BADOP(op) => write!(f, "BADOP(0x{:02x})", op),
+            VMError::BADOP(op) => write!(f, "BADOP(0x{:02X})", op),
             VMError::BADARG => write!(f, "BADARG"),
         }
     }
@@ -162,7 +162,7 @@ fn dissemble(input: &mut InputManager) -> Result<(), VMError> {
     while let Some(op) = input.take_op() {
         let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
         let arg = input.take_arg(inst.arg)?;
-        println!("{:02x}: {} {}", inst.op, inst.name, arg);
+        println!("{:02X}: {} {}", inst.op, inst.name, arg);
     }
 
     Ok(())

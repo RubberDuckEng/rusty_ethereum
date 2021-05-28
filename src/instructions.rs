@@ -27,19 +27,19 @@ impl fmt::Display for ArgValue {
         match self {
             ArgValue::Void => Ok(()),
             ArgValue::U8(value) => {
-                write!(f, "({})", value)
+                write!(f, "(0x{:02X})", value)
             }
             ArgValue::U16(value) => {
-                write!(f, "({})", value)
+                write!(f, "(0x{:02X})", value)
             }
             ArgValue::U32(value) => {
-                write!(f, "({})", value)
+                write!(f, "(0x{:02X})", value)
             }
             ArgValue::U64(value) => {
-                write!(f, "({})", value)
+                write!(f, "(0x{:02X})", value)
             }
             ArgValue::U128(value) => {
-                write!(f, "({})", value)
+                write!(f, "(0x{:02X})", value)
             }
         }
     }
