@@ -1,6 +1,6 @@
 use std::fmt;
 
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::ops::Add;
 
 #[derive(Default, Copy, Clone, PartialEq, Eq)]
@@ -31,33 +31,33 @@ impl Add for UInt256 {
     }
 }
 
-// impl TryFrom<UInt256> for usize {
-//     type Error = std::num::TryFromIntError;
-
-//     fn try_from(value: UInt256) -> Result<Self, Self::Error> {
-//         if value.high != 0 {
-//             // TryFromIntError is not directly construtable?
-//             // https://stackoverflow.com/questions/54374979/tryfrominterror-usage
-//             u128::MAX.try_into()
-//         } else {
-//             Self::try_from(value.low)
-//         }
-//     }
-// }
-
-impl TryInto<usize> for UInt256 {
+impl TryFrom<UInt256> for usize {
     type Error = std::num::TryFromIntError;
 
-    fn try_into(self) -> Result<usize, Self::Error> {
-        if self.high != 0 {
+    fn try_from(value: UInt256) -> Result<Self, Self::Error> {
+        if value.high != 0 {
             // TryFromIntError is not directly construtable?
             // https://stackoverflow.com/questions/54374979/tryfrominterror-usage
             u128::MAX.try_into()
         } else {
-            self.low.try_into()
+            Self::try_from(value.low)
         }
     }
 }
+
+// impl TryInto<usize> for UInt256 {
+//     type Error = std::num::TryFromIntError;
+
+//     fn try_into(self) -> Result<usize, Self::Error> {
+//         if self.high != 0 {
+//             // TryFromIntError is not directly construtable?
+//             // https://stackoverflow.com/questions/54374979/tryfrominterror-usage
+//             u128::MAX.try_into()
+//         } else {
+//             self.low.try_into()
+//         }
+//     }
+// }
 
 fn u128_from_be_slice(bytes: &[u8]) -> u128 {
     let mut word: u128 = 0;

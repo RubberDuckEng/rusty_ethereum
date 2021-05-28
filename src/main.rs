@@ -4,10 +4,11 @@ use itertools::Itertools;
 
 // use bytes::Bytes;
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::fs;
 use std::iter::Iterator;
+use std::ops::Range;
 
 mod instructions;
 mod remix_json;
@@ -77,6 +78,8 @@ struct Task {
     stack: Stack,
     memory: Memory,
     input: InputManager,
+    return_data: Vec<u8>,
+    is_complete: bool,
 }
 
 impl Task {
@@ -99,6 +102,15 @@ impl Memory {
         value.to_be_bytes(&mut self.storage[index..end]);
         Ok(())
     }
+
+    fn copy_out(&self, range: Range<UInt256>) -> Result<Vec<u8>, VMError> {
+        let mut out = Vec::new();
+        let start = usize::try_from(range.start).map_err(|_| VMError::UNDERFLOW)?;
+        let end = usize::try_from(range.end).map_err(|_| VMError::UNDERFLOW)?;
+        let usize_range = start..end;
+        out.copy_from_slice(&self.storage[usize_range]);
+        Ok(out)
+    }
 }
 
 impl Task {
@@ -107,6 +119,7 @@ impl Task {
         instruction: &Instruction,
         arg_option: Option<UInt256>,
     ) -> Result<(), VMError> {
+        assert!(!self.is_complete);
         let stack = &mut self.stack;
         print_instruction(instruction, arg_option);
         match *instruction {
@@ -139,6 +152,13 @@ impl Task {
                     self.input.index = destination.try_into().map_err(|_| VMError::UNDERFLOW)?;
                 }
             }
+            OP_REVERT => {
+                // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-140.md
+                let offset = stack.pop()?;
+                let length = stack.pop()?;
+                self.return_data = self.memory.copy_out(offset..offset + length)?;
+                self.is_complete = true;
+            }
             // All push instructions:
             Instruction {
                 op: 0x60..=0x7F, ..
@@ -152,12 +172,19 @@ impl Task {
         }
         Ok(())
     }
+    fn take_op(&mut self) -> Option<u8> {
+        if self.is_complete {
+            None
+        } else {
+            self.input.take_op()
+        }
+    }
     fn execute(&mut self) -> Result<(), VMError> {
         let ops: HashMap<_, _> = INSTRUCTIONS
             .iter()
             .map(|instruction| (instruction.op, instruction))
             .collect();
-        while let Some(op) = self.input.take_op() {
+        while let Some(op) = self.take_op() {
             let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
             let arg_option = self.input.take_arg(inst.arg)?;
             self.execute_single_instruction(inst, arg_option)?;
@@ -274,7 +301,10 @@ fn main_execute() {
 
     let mut task = Task::new(input);
     match task.execute() {
-        Ok(()) => println!("DONE: {:?}", task.stack.values),
+        Ok(()) => println!(
+            "DONE: Stack: {:?}, Return Data: {:?}",
+            task.stack.values, task.return_data
+        ),
         Err(error) => println!("ERROR: {:?}", error),
     }
 }
