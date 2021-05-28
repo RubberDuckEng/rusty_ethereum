@@ -8,6 +8,9 @@ use std::fmt;
 use std::fs;
 use std::iter::Iterator;
 
+use serde::{Deserialize, Serialize};
+use serde_json;
+
 mod instructions;
 
 use crate::instructions::*;
@@ -59,28 +62,12 @@ impl UInt256 {
     }
 }
 
-// Couple probably just use Option<UInt128> instead?
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum ArgValue {
-    Void,
-    U8(UInt256),
-    U16(UInt256),
-    U32(UInt256),
-    U64(UInt256),
-    U128(UInt256),
-}
-
-impl fmt::Display for ArgValue {
+impl fmt::Display for UInt256 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ArgValue::Void => Ok(()),
-            ArgValue::U8(value)
-            | ArgValue::U16(value)
-            | ArgValue::U32(value)
-            | ArgValue::U64(value)
-            | ArgValue::U128(value) => {
-                write!(f, "(0x{:02X})", value.low)
-            }
+        if self.high == 0 {
+            write!(f, "(0x{:02X})", self.low)
+        } else {
+            write!(f, "(0x{:X}{:02X})", self.high, self.low)
         }
     }
 }
@@ -176,18 +163,41 @@ impl InputManager {
         self.take_u8().ok()
     }
 
-    fn take_arg(&mut self, arg_type: ArgType) -> Result<ArgValue, VMError> {
+    fn take_arg(&mut self, arg_type: ArgType) -> Result<Option<UInt256>, VMError> {
         Ok(match arg_type {
-            ArgType::Void => ArgValue::Void,
-            ArgType::U8 => ArgValue::U8(self.take(1)?),
-            ArgType::U16 => ArgValue::U16(self.take(2)?),
-            ArgType::U24 => ArgValue::U32(self.take(3)?),
-            ArgType::U32 => ArgValue::U32(self.take(4)?),
-            ArgType::U40 => ArgValue::U32(self.take(5)?),
-            ArgType::U48 => ArgValue::U32(self.take(6)?),
-            ArgType::U56 => ArgValue::U32(self.take(7)?),
-            ArgType::U64 => ArgValue::U64(self.take(8)?),
-            ArgType::U128 => ArgValue::U128(self.take(16)?),
+            ArgType::Void => None,
+            ArgType::U8 => Some(self.take(1)?),
+            ArgType::U16 => Some(self.take(2)?),
+            ArgType::U24 => Some(self.take(3)?),
+            ArgType::U32 => Some(self.take(4)?),
+            ArgType::U40 => Some(self.take(5)?),
+            ArgType::U48 => Some(self.take(6)?),
+            ArgType::U56 => Some(self.take(7)?),
+            ArgType::U64 => Some(self.take(8)?),
+            ArgType::U72 => Some(self.take(9)?),
+            ArgType::U80 => Some(self.take(10)?),
+            ArgType::U88 => Some(self.take(11)?),
+            ArgType::U96 => Some(self.take(12)?),
+            ArgType::U104 => Some(self.take(13)?),
+            ArgType::U112 => Some(self.take(14)?),
+            ArgType::U120 => Some(self.take(15)?),
+            ArgType::U128 => Some(self.take(16)?),
+            ArgType::U136 => Some(self.take(17)?),
+            ArgType::U144 => Some(self.take(18)?),
+            ArgType::U152 => Some(self.take(19)?),
+            ArgType::U160 => Some(self.take(20)?),
+            ArgType::U168 => Some(self.take(21)?),
+            ArgType::U176 => Some(self.take(22)?),
+            ArgType::U184 => Some(self.take(23)?),
+            ArgType::U192 => Some(self.take(24)?),
+            ArgType::U200 => Some(self.take(25)?),
+            ArgType::U208 => Some(self.take(26)?),
+            ArgType::U216 => Some(self.take(27)?),
+            ArgType::U224 => Some(self.take(28)?),
+            ArgType::U232 => Some(self.take(29)?),
+            ArgType::U240 => Some(self.take(30)?),
+            ArgType::U248 => Some(self.take(31)?),
+            ArgType::U256 => Some(self.take(32)?),
         })
     }
 }
@@ -200,19 +210,32 @@ fn dissemble(input: &mut InputManager) -> Result<(), VMError> {
 
     while let Some(op) = input.take_op() {
         let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
-        let arg = input.take_arg(inst.arg)?;
-        println!("{:02X}: {} {}", inst.op, inst.name, arg);
+        let arg_option = input.take_arg(inst.arg)?;
+        match arg_option {
+            Some(arg) => println!("{:02X}: {} {}", inst.op, inst.name, arg),
+            None => println!("{:02X}: {}", inst.op, inst.name),
+        }
     }
 
     Ok(())
 }
 
-fn main() {
-    let filename = "bin/fixtures/Counter.bin";
-    println!("In file {}", filename);
+#[derive(Serialize, Deserialize)]
+struct RemixCompileResult {
+    object: String,
+    opcodes: String,
+}
 
+fn main() {
+    // let filename = "bin/fixtures/Counter.bin";
+    // println!("In file {}", filename);
+    // let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
+
+    let filename = "fixtures/counter_bytecode_8_0_1_remix.json";
     let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
-    let mut input = InputManager::new(&contents);
+    let compile_result: RemixCompileResult = serde_json::from_str(&contents).unwrap();
+
+    let mut input = InputManager::new(&compile_result.object);
 
     match dissemble(&mut input) {
         Ok(()) => println!("DONE"),
@@ -229,7 +252,7 @@ fn main() {
 
     // let mut parser = { contents.bytes() };
 
-    println!("With text:\n{}", contents);
+    // println!("With text:\n{}", contents);
 
     // let mut stack = Stack::default();
     // match playground(&mut stack) {

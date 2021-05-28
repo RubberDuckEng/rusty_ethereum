@@ -11,7 +11,30 @@ pub enum ArgType {
     U48,
     U56,
     U64,
+    U72,
+    U80,
+    U88,
+    U96,
+    U104,
+    U112,
+    U120,
     U128,
+    U136,
+    U144,
+    U152,
+    U160,
+    U168,
+    U176,
+    U184,
+    U192,
+    U200,
+    U208,
+    U216,
+    U224,
+    U232,
+    U240,
+    U248,
+    U256,
 }
 
 #[derive(Debug)]
@@ -101,7 +124,30 @@ pub const OP_PUSH5: Instruction = Instruction { op: 0x64, name: "PUSH5", arg: Ar
 pub const OP_PUSH6: Instruction = Instruction { op: 0x65, name: "PUSH6", arg: ArgType::U48 };
 pub const OP_PUSH7: Instruction = Instruction { op: 0x66, name: "PUSH7", arg: ArgType::U56 };
 pub const OP_PUSH8: Instruction = Instruction { op: 0x67, name: "PUSH8", arg: ArgType::U64 };
+pub const OP_PUSH9: Instruction = Instruction { op: 0x68, name: "PUSH9", arg: ArgType::U72 };
+pub const OP_PUSH10: Instruction = Instruction { op: 0x69, name: "PUSH10", arg: ArgType::U80 };
+pub const OP_PUSH11: Instruction = Instruction { op: 0x6A, name: "PUSH11", arg: ArgType::U88 };
+pub const OP_PUSH12: Instruction = Instruction { op: 0x6B, name: "PUSH12", arg: ArgType::U96 };
+pub const OP_PUSH13: Instruction = Instruction { op: 0x6C, name: "PUSH13", arg: ArgType::U104 };
+pub const OP_PUSH14: Instruction = Instruction { op: 0x6D, name: "PUSH14", arg: ArgType::U112 };
+pub const OP_PUSH15: Instruction = Instruction { op: 0x6E, name: "PUSH15", arg: ArgType::U120 };
 pub const OP_PUSH16: Instruction = Instruction { op: 0x6F, name: "PUSH16", arg: ArgType::U128 };
+pub const OP_PUSH17: Instruction = Instruction { op: 0x70, name: "PUSH17", arg: ArgType::U136 };
+pub const OP_PUSH18: Instruction = Instruction { op: 0x71, name: "PUSH18", arg: ArgType::U144 };
+pub const OP_PUSH19: Instruction = Instruction { op: 0x72, name: "PUSH19", arg: ArgType::U152 };
+pub const OP_PUSH20: Instruction = Instruction { op: 0x73, name: "PUSH20", arg: ArgType::U160 };
+pub const OP_PUSH21: Instruction = Instruction { op: 0x74, name: "PUSH21", arg: ArgType::U168 };
+pub const OP_PUSH22: Instruction = Instruction { op: 0x75, name: "PUSH22", arg: ArgType::U176 };
+pub const OP_PUSH23: Instruction = Instruction { op: 0x76, name: "PUSH23", arg: ArgType::U184 };
+pub const OP_PUSH24: Instruction = Instruction { op: 0x77, name: "PUSH24", arg: ArgType::U192 };
+pub const OP_PUSH25: Instruction = Instruction { op: 0x78, name: "PUSH25", arg: ArgType::U200 };
+pub const OP_PUSH26: Instruction = Instruction { op: 0x79, name: "PUSH26", arg: ArgType::U208 };
+pub const OP_PUSH27: Instruction = Instruction { op: 0x7A, name: "PUSH27", arg: ArgType::U216 };
+pub const OP_PUSH28: Instruction = Instruction { op: 0x7B, name: "PUSH28", arg: ArgType::U224 };
+pub const OP_PUSH29: Instruction = Instruction { op: 0x7C, name: "PUSH29", arg: ArgType::U232 };
+pub const OP_PUSH30: Instruction = Instruction { op: 0x7D, name: "PUSH30", arg: ArgType::U240 };
+pub const OP_PUSH31: Instruction = Instruction { op: 0x7E, name: "PUSH31", arg: ArgType::U248 };
+pub const OP_PUSH32: Instruction = Instruction { op: 0x7F, name: "PUSH32", arg: ArgType::U256 };
 pub const OP_DUP1: Instruction = Instruction { op: 0x80, name: "DUP1", arg: ArgType::Void };
 pub const OP_DUP2: Instruction = Instruction { op: 0x81, name: "DUP2", arg: ArgType::Void };
 pub const OP_DUP3: Instruction = Instruction { op: 0x82, name: "DUP3", arg: ArgType::Void };
@@ -148,7 +194,7 @@ pub const OP_REVERT: Instruction = Instruction { op: 0xfd, name: "REVERT", arg: 
 pub const OP_INVALID: Instruction = Instruction { op: 0xfe, name: "INVALID", arg: ArgType::Void };
 pub const OP_SELFDESTRUCT: Instruction = Instruction { op: 0xff, name: "SELFDESTRUCT", arg: ArgType::Void };
 
-pub const INSTRUCTIONS: [Instruction; 112] = [
+pub const INSTRUCTIONS: [Instruction; 135] = [
     OP_STOP,
     OP_ADD,
     OP_MUL,
@@ -215,7 +261,30 @@ pub const INSTRUCTIONS: [Instruction; 112] = [
     OP_PUSH6,
     OP_PUSH7,
     OP_PUSH8,
+    OP_PUSH9,
+    OP_PUSH10,
+    OP_PUSH11,
+    OP_PUSH12,
+    OP_PUSH13,
+    OP_PUSH14,
+    OP_PUSH15,
     OP_PUSH16,
+    OP_PUSH17,
+    OP_PUSH18,
+    OP_PUSH19,
+    OP_PUSH20,
+    OP_PUSH21,
+    OP_PUSH22,
+    OP_PUSH23,
+    OP_PUSH24,
+    OP_PUSH25,
+    OP_PUSH26,
+    OP_PUSH27,
+    OP_PUSH28,
+    OP_PUSH29,
+    OP_PUSH30,
+    OP_PUSH31,
+    OP_PUSH32,
     OP_DUP1,
     OP_DUP2,
     OP_DUP3,
