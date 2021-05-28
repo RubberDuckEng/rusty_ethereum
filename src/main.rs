@@ -5,6 +5,7 @@ use itertools::Itertools;
 // use bytes::Bytes;
 use std::collections::HashMap;
 use std::fmt;
+use std::fs;
 use std::iter::Iterator;
 
 mod instructions;
@@ -49,52 +50,49 @@ impl Stack {
     }
 }
 
-fn execute_single_instruction(
-    stack: &mut Stack,
-    instruction: &Instruction,
-    arg_option: Option<UInt256>,
-) -> Result<(), VMError> {
-    match *instruction {
-        OP_ADD => {
-            let result = stack.pop()? + stack.pop()?;
-            stack.push(result);
-        }
-        // All push instructions:
-        Instruction {
-            op: 0x60..=0x7F, ..
-        } => {
-            let arg = arg_option.ok_or(VMError::BADARG)?;
-            stack.push(arg);
-        }
-        _ => {
-            return Err(VMError::BADOP(instruction.op));
-        }
-    }
-    Ok(())
+#[derive(Default)]
+struct EVM {
+    stack: Stack,
 }
 
-fn execute_instruction_stream(stack: &mut Stack, instructions: &[u8]) -> Result<(), VMError> {
-    let ops: HashMap<_, _> = INSTRUCTIONS
-        .iter()
-        .map(|instruction| (instruction.op, instruction))
-        .collect();
-
-    let mut input = InputManager {
-        ops: instructions.to_vec(),
-        index: 0,
-    };
-    while let Some(op) = input.take_op() {
-        let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
-        let arg_option = input.take_arg(inst.arg)?;
-        execute_single_instruction(stack, inst, arg_option)?;
+impl EVM {
+    fn execute_single_instruction(
+        &mut self,
+        instruction: &Instruction,
+        arg_option: Option<UInt256>,
+    ) -> Result<(), VMError> {
+        let stack = &mut self.stack;
+        print_instruction(instruction, arg_option);
+        match *instruction {
+            OP_ADD => {
+                let result = stack.pop()? + stack.pop()?;
+                stack.push(result);
+            }
+            // All push instructions:
+            Instruction {
+                op: 0x60..=0x7F, ..
+            } => {
+                let arg = arg_option.ok_or(VMError::BADARG)?;
+                stack.push(arg);
+            }
+            _ => {
+                return Err(VMError::BADOP(instruction.op));
+            }
+        }
+        Ok(())
     }
-
-    Ok(())
-}
-
-fn playground(stack: &mut Stack) -> Result<(), VMError> {
-    let instructions: Vec<u8> = vec![OP_PUSH1.op, 1, OP_PUSH1.op, 2, OP_ADD.op];
-    return execute_instruction_stream(stack, &instructions);
+    fn execute_instruction_stream(&mut self, input: &mut InputManager) -> Result<(), VMError> {
+        let ops: HashMap<_, _> = INSTRUCTIONS
+            .iter()
+            .map(|instruction| (instruction.op, instruction))
+            .collect();
+        while let Some(op) = input.take_op() {
+            let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
+            let arg_option = input.take_arg(inst.arg)?;
+            self.execute_single_instruction(inst, arg_option)?;
+        }
+        Ok(())
+    }
 }
 
 struct InputManager {
@@ -152,6 +150,13 @@ impl InputManager {
     }
 }
 
+fn print_instruction(inst: &Instruction, arg_option: Option<UInt256>) {
+    match arg_option {
+        Some(arg) => println!("{:02X}: {} {}", inst.op, inst.name, arg),
+        None => println!("{:02X}: {}", inst.op, inst.name),
+    }
+}
+
 fn dissemble(input: &mut InputManager) -> Result<(), VMError> {
     let ops: HashMap<_, _> = INSTRUCTIONS
         .iter()
@@ -161,10 +166,7 @@ fn dissemble(input: &mut InputManager) -> Result<(), VMError> {
     while let Some(op) = input.take_op() {
         let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
         let arg_option = input.take_arg(inst.arg)?;
-        match arg_option {
-            Some(arg) => println!("{:02X}: {} {}", inst.op, inst.name, arg),
-            None => println!("{:02X}: {}", inst.op, inst.name),
-        }
+        print_instruction(inst, arg_option);
     }
 
     Ok(())
@@ -187,9 +189,20 @@ fn main_disassemble() {
 }
 
 fn main_execute() {
-    let mut stack = Stack::default();
-    match playground(&mut stack) {
-        Ok(()) => println!("DONE: {:?}", stack.values),
+    let filename = "bin/fixtures/Counter.bin";
+    println!("In file {}", filename);
+    let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
+    let mut input = InputManager::new(&contents);
+
+    // let instructions: Vec<u8> = vec![OP_PUSH1.op, 1, OP_PUSH1.op, 2, OP_ADD.op];
+    // let mut input = InputManager {
+    //     ops: instructions,
+    //     index: 0,
+    // };
+
+    let mut vm = EVM::default();
+    match vm.execute_instruction_stream(&mut input) {
+        Ok(()) => println!("DONE: {:?}", vm.stack.values),
         Err(error) => println!("ERROR: {:?}", error),
     }
 }
