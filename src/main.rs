@@ -5,16 +5,14 @@ use itertools::Itertools;
 // use bytes::Bytes;
 use std::collections::HashMap;
 use std::fmt;
-use std::fs;
 use std::iter::Iterator;
 
-use serde::Deserialize;
-use serde_json;
-
 mod instructions;
+mod remix_json;
 mod uint256;
 
 use crate::instructions::*;
+use crate::remix_json::*;
 use crate::uint256::*;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -172,22 +170,15 @@ fn dissemble(input: &mut InputManager) -> Result<(), VMError> {
     Ok(())
 }
 
-#[derive(Deserialize)]
-struct RemixCompileResult {
-    object: String,
-    opcodes: String,
-}
-
 fn main_disassemble() {
     // let filename = "bin/fixtures/Counter.bin";
     // println!("In file {}", filename);
     // let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
 
     let filename = "fixtures/counter_bytecode_8_0_1_remix.json";
-    let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
-    let compile_result: RemixCompileResult = serde_json::from_str(&contents).unwrap();
+    let result = read_remix_json(filename);
 
-    let mut input = InputManager::new(&compile_result.object);
+    let mut input = InputManager::new(&result.object);
 
     match dissemble(&mut input) {
         Ok(()) => println!("DONE"),
