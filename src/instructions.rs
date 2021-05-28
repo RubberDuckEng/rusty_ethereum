@@ -1,48 +1,17 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-use std::fmt;
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ArgType {
     Void,
     U8,
     U16,
+    U24,
     U32,
+    U40,
+    U48,
+    U56,
     U64,
     U128,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum ArgValue {
-    Void,
-    U8(u8),
-    U16(u16),
-    U32(u32),
-    U64(u64),
-    U128(u128),
-}
-
-impl fmt::Display for ArgValue {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ArgValue::Void => Ok(()),
-            ArgValue::U8(value) => {
-                write!(f, "(0x{:02X})", value)
-            }
-            ArgValue::U16(value) => {
-                write!(f, "(0x{:02X})", value)
-            }
-            ArgValue::U32(value) => {
-                write!(f, "(0x{:02X})", value)
-            }
-            ArgValue::U64(value) => {
-                write!(f, "(0x{:02X})", value)
-            }
-            ArgValue::U128(value) => {
-                write!(f, "(0x{:02X})", value)
-            }
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -126,11 +95,11 @@ pub const OP_GAS: Instruction = Instruction { op: 0x5a, name: "GAS", arg: ArgTyp
 pub const OP_JUMPDEST: Instruction = Instruction { op: 0x5b, name: "JUMPDEST", arg: ArgType::Void };
 pub const OP_PUSH1: Instruction = Instruction { op: 0x60, name: "PUSH1", arg: ArgType::U8 };
 pub const OP_PUSH2: Instruction = Instruction { op: 0x61, name: "PUSH2", arg: ArgType::U16 };
-// pub const OP_PUSH3: Instruction = Instruction { op: 0x62, name: "PUSH3", arg: ArgType::U24 };
+pub const OP_PUSH3: Instruction = Instruction { op: 0x62, name: "PUSH3", arg: ArgType::U24 };
 pub const OP_PUSH4: Instruction = Instruction { op: 0x63, name: "PUSH4", arg: ArgType::U32 };
-// pub const OP_PUSH5: Instruction = Instruction { op: 0x64, name: "PUSH5", arg: ArgType::U40 };
-// pub const OP_PUSH6: Instruction = Instruction { op: 0x65, name: "PUSH6", arg: ArgType::U48 };
-// pub const OP_PUSH7: Instruction = Instruction { op: 0x66, name: "PUSH7", arg: ArgType::U56 };
+pub const OP_PUSH5: Instruction = Instruction { op: 0x64, name: "PUSH5", arg: ArgType::U40 };
+pub const OP_PUSH6: Instruction = Instruction { op: 0x65, name: "PUSH6", arg: ArgType::U48 };
+pub const OP_PUSH7: Instruction = Instruction { op: 0x66, name: "PUSH7", arg: ArgType::U56 };
 pub const OP_PUSH8: Instruction = Instruction { op: 0x67, name: "PUSH8", arg: ArgType::U64 };
 pub const OP_PUSH16: Instruction = Instruction { op: 0x6F, name: "PUSH16", arg: ArgType::U128 };
 pub const OP_DUP1: Instruction = Instruction { op: 0x80, name: "DUP1", arg: ArgType::Void };
@@ -179,7 +148,7 @@ pub const OP_REVERT: Instruction = Instruction { op: 0xfd, name: "REVERT", arg: 
 pub const OP_INVALID: Instruction = Instruction { op: 0xfe, name: "INVALID", arg: ArgType::Void };
 pub const OP_SELFDESTRUCT: Instruction = Instruction { op: 0xff, name: "SELFDESTRUCT", arg: ArgType::Void };
 
-pub const INSTRUCTIONS: [Instruction; 108] = [
+pub const INSTRUCTIONS: [Instruction; 112] = [
     OP_STOP,
     OP_ADD,
     OP_MUL,
@@ -240,7 +209,11 @@ pub const INSTRUCTIONS: [Instruction; 108] = [
     OP_JUMPDEST,
     OP_PUSH1,
     OP_PUSH2,
+    OP_PUSH3,
     OP_PUSH4,
+    OP_PUSH5,
+    OP_PUSH6,
+    OP_PUSH7,
     OP_PUSH8,
     OP_PUSH16,
     OP_DUP1,

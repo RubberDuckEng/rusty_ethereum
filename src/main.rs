@@ -4,7 +4,6 @@ use itertools::Itertools;
 
 // use bytes::Bytes;
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::fmt;
 use std::fs;
 use std::iter::Iterator;
@@ -31,7 +30,63 @@ impl fmt::Debug for VMError {
 }
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
-struct Word(u32);
+pub struct UInt256 {
+    high: u128,
+    low: u128,
+}
+
+fn u128_from_be_slice(bytes: &[u8]) -> u128 {
+    let mut word: u128 = 0;
+    for byte in bytes {
+        word <<= 8;
+        word += *byte as u128;
+    }
+    return word;
+}
+
+impl UInt256 {
+    pub fn from_be_slice(bytes: &[u8]) -> UInt256 {
+        if bytes.len() > 8 {
+            return UInt256 {
+                high: u128_from_be_slice(&bytes[8..]),
+                low: u128_from_be_slice(&bytes[..8]),
+            };
+        }
+        return UInt256 {
+            high: 0,
+            low: u128_from_be_slice(bytes),
+        };
+    }
+}
+
+// Couple probably just use Option<UInt128> instead?
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ArgValue {
+    Void,
+    U8(UInt256),
+    U16(UInt256),
+    U32(UInt256),
+    U64(UInt256),
+    U128(UInt256),
+}
+
+impl fmt::Display for ArgValue {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ArgValue::Void => Ok(()),
+            ArgValue::U8(value)
+            | ArgValue::U16(value)
+            | ArgValue::U32(value)
+            | ArgValue::U64(value)
+            | ArgValue::U128(value) => {
+                write!(f, "(0x{:02X})", value.low)
+            }
+        }
+    }
+}
+
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
+struct Word(UInt256);
 
 #[derive(Default)]
 struct Stack {
@@ -80,25 +135,6 @@ struct Stack {
 //     Ok(())
 // }
 
-trait EndianRead {
-    type Array;
-    fn from_be_slice(bytes: &[u8]) -> Self;
-}
-
-macro_rules! impl_EndianRead_for_ints (( $($int:ident),* ) => {
-    $(
-        impl EndianRead for $int {
-            type Array = [u8; std::mem::size_of::<Self>()];
-            fn from_be_slice(bytes: &[u8]) -> Self {
-                let array = bytes.try_into().unwrap();
-                Self::from_be_bytes(array)
-            }
-        }
-    )*
-});
-
-impl_EndianRead_for_ints!(u8, u16, u32, u64, u128);
-
 struct InputManager {
     ops: Vec<u8>,
     index: usize,
@@ -125,13 +161,12 @@ impl InputManager {
         }
     }
 
-    fn take<T: EndianRead>(&mut self) -> Result<T, VMError> {
-        let size = std::mem::size_of::<T>();
+    fn take(&mut self, size: usize) -> Result<UInt256, VMError> {
         let end = self.index + size;
         if end <= self.ops.len() {
             let bytes = &self.ops[self.index..end];
             self.index += size;
-            Ok(T::from_be_slice(bytes))
+            Ok(UInt256::from_be_slice(bytes))
         } else {
             Err(VMError::BADARG)
         }
@@ -144,11 +179,15 @@ impl InputManager {
     fn take_arg(&mut self, arg_type: ArgType) -> Result<ArgValue, VMError> {
         Ok(match arg_type {
             ArgType::Void => ArgValue::Void,
-            ArgType::U8 => ArgValue::U8(self.take::<u8>()?),
-            ArgType::U16 => ArgValue::U16(self.take::<u16>()?),
-            ArgType::U32 => ArgValue::U32(self.take::<u32>()?),
-            ArgType::U64 => ArgValue::U64(self.take::<u64>()?),
-            ArgType::U128 => ArgValue::U128(self.take::<u128>()?),
+            ArgType::U8 => ArgValue::U8(self.take(1)?),
+            ArgType::U16 => ArgValue::U16(self.take(2)?),
+            ArgType::U24 => ArgValue::U32(self.take(3)?),
+            ArgType::U32 => ArgValue::U32(self.take(4)?),
+            ArgType::U40 => ArgValue::U32(self.take(5)?),
+            ArgType::U48 => ArgValue::U32(self.take(6)?),
+            ArgType::U56 => ArgValue::U32(self.take(7)?),
+            ArgType::U64 => ArgValue::U64(self.take(8)?),
+            ArgType::U128 => ArgValue::U128(self.take(16)?),
         })
     }
 }
