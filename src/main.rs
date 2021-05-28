@@ -38,23 +38,35 @@ type Word = UInt256;
 
 #[derive(Default)]
 struct Stack {
-    pub values: Vec<Word>,
+    values: Vec<Word>,
 }
 
-fn execute(
+impl Stack {
+    fn push(&mut self, value: UInt256) {
+        return self.values.push(value);
+    }
+
+    fn pop(&mut self) -> Result<UInt256, VMError> {
+        return self.values.pop().ok_or(VMError::UNDERFLOW);
+    }
+}
+
+fn execute_single_instruction(
     stack: &mut Stack,
     instruction: &Instruction,
     arg_option: Option<UInt256>,
 ) -> Result<(), VMError> {
     match *instruction {
         OP_ADD => {
-            let a = stack.values.pop().ok_or(VMError::UNDERFLOW)?;
-            let b = stack.values.pop().ok_or(VMError::UNDERFLOW)?;
-            stack.values.push(a + b);
+            let result = stack.pop()? + stack.pop()?;
+            stack.push(result);
         }
-        OP_PUSH1 => {
-            let word = arg_option.ok_or(VMError::BADARG)?;
-            stack.values.push(word);
+        // All push instructions:
+        Instruction {
+            op: 0x60..=0x7F, ..
+        } => {
+            let arg = arg_option.ok_or(VMError::BADARG)?;
+            stack.push(arg);
         }
         _ => {
             return Err(VMError::BADOP(instruction.op));
@@ -63,24 +75,28 @@ fn execute(
     Ok(())
 }
 
-fn playground(stack: &mut Stack) -> Result<(), VMError> {
+fn execute_instruction_stream(stack: &mut Stack, instructions: &[u8]) -> Result<(), VMError> {
     let ops: HashMap<_, _> = INSTRUCTIONS
         .iter()
         .map(|instruction| (instruction.op, instruction))
         .collect();
 
-    let instructions: Vec<u8> = vec![OP_PUSH1.op, 1, OP_PUSH1.op, 2, OP_ADD.op];
     let mut input = InputManager {
-        ops: instructions,
+        ops: instructions.to_vec(),
         index: 0,
     };
     while let Some(op) = input.take_op() {
         let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
         let arg_option = input.take_arg(inst.arg)?;
-        execute(stack, inst, arg_option)?;
+        execute_single_instruction(stack, inst, arg_option)?;
     }
 
     Ok(())
+}
+
+fn playground(stack: &mut Stack) -> Result<(), VMError> {
+    let instructions: Vec<u8> = vec![OP_PUSH1.op, 1, OP_PUSH1.op, 2, OP_ADD.op];
+    return execute_instruction_stream(stack, &instructions);
 }
 
 struct InputManager {
