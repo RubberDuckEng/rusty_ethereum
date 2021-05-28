@@ -8,12 +8,14 @@ use std::fmt;
 use std::fs;
 use std::iter::Iterator;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json;
 
 mod instructions;
+mod uint256;
 
 use crate::instructions::*;
+use crate::uint256::*;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum VMError {
@@ -32,95 +34,54 @@ impl fmt::Debug for VMError {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
-pub struct UInt256 {
-    high: u128,
-    low: u128,
-}
-
-fn u128_from_be_slice(bytes: &[u8]) -> u128 {
-    let mut word: u128 = 0;
-    for byte in bytes {
-        word <<= 8;
-        word += *byte as u128;
-    }
-    return word;
-}
-
-impl UInt256 {
-    pub fn from_be_slice(bytes: &[u8]) -> UInt256 {
-        if bytes.len() > 8 {
-            return UInt256 {
-                high: u128_from_be_slice(&bytes[8..]),
-                low: u128_from_be_slice(&bytes[..8]),
-            };
-        }
-        return UInt256 {
-            high: 0,
-            low: u128_from_be_slice(bytes),
-        };
-    }
-}
-
-impl fmt::Display for UInt256 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.high == 0 {
-            write!(f, "(0x{:02X})", self.low)
-        } else {
-            write!(f, "(0x{:X}{:02X})", self.high, self.low)
-        }
-    }
-}
-
-#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
-struct Word(UInt256);
+type Word = UInt256;
 
 #[derive(Default)]
 struct Stack {
     pub values: Vec<Word>,
 }
 
-// #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-// enum Instruction::new(
-//     Add(),
-//     Push1(u8),
-// }
+fn execute(
+    stack: &mut Stack,
+    instruction: &Instruction,
+    arg_option: Option<UInt256>,
+) -> Result<(), VMError> {
+    match *instruction {
+        OP_ADD => {
+            let a = stack.values.pop().ok_or(VMError::UNDERFLOW)?;
+            let b = stack.values.pop().ok_or(VMError::UNDERFLOW)?;
+            stack.values.push(a + b);
+        }
+        OP_PUSH1 => {
+            let word = arg_option.ok_or(VMError::BADARG)?;
+            stack.values.push(word);
+        }
+        _ => {
+            return Err(VMError::BADOP(instruction.op));
+        }
+    }
+    Ok(())
+}
 
-// struct InstructionStream {
-//     ip: usize,
-// }
+fn playground(stack: &mut Stack) -> Result<(), VMError> {
+    let ops: HashMap<_, _> = INSTRUCTIONS
+        .iter()
+        .map(|instruction| (instruction.op, instruction))
+        .collect();
 
-// fn execute(
-//     stack: &mut Stack,
-//     op: Instruction,
-//     more: &mut std::slice::Iter<Instruction>,
-// ) -> Result<(), VMError> {
-//     println!("{:?}", op);
-//     match op {
-//         OP_ADD => {
-//             let a = stack.values.pop().ok_or(VMError::UNDERFLOW)?;
-//             let b = stack.values.pop().ok_or(VMError::UNDERFLOW)?;
-//             stack.values.push(Word(a.0 + b.0));
-//         }
-//         OP_PUSH1 => stack
-//             .values
-//             .push(Word(*more.next().ok_or(VMError::BADOP)? as u32)),
-//         _ => {
-//             return Err(VMError::BADOP);
-//         }
-//     }
-//     Ok(())
-// }
+    let instructions: Vec<u8> = vec![OP_PUSH1.op, 1, OP_PUSH1.op, 2, OP_ADD.op];
+    let mut input = InputManager {
+        ops: instructions,
+        index: 0,
+    };
+    while let Some(op) = input.take_op() {
+        let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
+        let arg_option = input.take_arg(inst.arg)?;
+        execute(stack, inst, arg_option)?;
+    }
 
-// fn playground(stack: &mut Stack) -> Result<(), VMError> {
-//     let instructions: Vec<Instruction> = vec![OP_PUSH1, 1, OP_PUSH1, 2, OP_ADD];
-//     let mut iter = instructions.iter();
-//     while let Some(op) = iter.next() {
-//         execute(stack, *op, &mut iter)?;
-//     }
-
-//     Ok(())
-// }
+    Ok(())
+}
 
 struct InputManager {
     ops: Vec<u8>,
@@ -195,13 +156,13 @@ fn dissemble(input: &mut InputManager) -> Result<(), VMError> {
     Ok(())
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 struct RemixCompileResult {
     object: String,
     opcodes: String,
 }
 
-fn main() {
+fn main_disassemble() {
     // let filename = "bin/fixtures/Counter.bin";
     // println!("In file {}", filename);
     // let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
@@ -216,12 +177,19 @@ fn main() {
         Ok(()) => println!("DONE"),
         Err(error) => println!("ERROR: {:?}", error),
     }
+}
 
-    // let mut stack = Stack::default();
-    // match playground(&mut stack) {
-    //     Ok(()) => println!("DONE: {:?}", stack.values),
-    //     Err(error) => println!("ERROR: {:?}", error),
-    // }
+fn main_execute() {
+    let mut stack = Stack::default();
+    match playground(&mut stack) {
+        Ok(()) => println!("DONE: {:?}", stack.values),
+        Err(error) => println!("ERROR: {:?}", error),
+    }
+}
+
+fn main() {
+    // main_disassemble();
+    main_execute();
 }
 
 #[cfg(test)]

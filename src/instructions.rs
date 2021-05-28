@@ -8,7 +8,7 @@ pub enum ArgType {
     U(Bits),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Instruction {
     pub op: u8,
     pub name: &'static str,
@@ -16,7 +16,7 @@ pub struct Instruction {
 }
 
 impl Instruction {
-    pub fn new(op: u8, name: &'static str) -> Instruction {
+    fn new(op: u8, name: &'static str) -> Instruction {
         Instruction {
             op,
             name,
@@ -24,7 +24,7 @@ impl Instruction {
         }
     }
 
-    pub fn new_with_arg(op: u8, name: &'static str, arg: ArgType) -> Instruction {
+    fn new_with_arg(op: u8, name: &'static str, arg: ArgType) -> Instruction {
         Instruction { op, name, arg }
     }
 }
