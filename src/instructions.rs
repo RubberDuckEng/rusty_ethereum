@@ -1,40 +1,11 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
+type Bits = usize;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ArgType {
     Void,
-    U8,
-    U16,
-    U24,
-    U32,
-    U40,
-    U48,
-    U56,
-    U64,
-    U72,
-    U80,
-    U88,
-    U96,
-    U104,
-    U112,
-    U120,
-    U128,
-    U136,
-    U144,
-    U152,
-    U160,
-    U168,
-    U176,
-    U184,
-    U192,
-    U200,
-    U208,
-    U216,
-    U224,
-    U232,
-    U240,
-    U248,
-    U256,
+    U(Bits),
 }
 
 #[derive(Debug)]
@@ -116,38 +87,38 @@ pub const OP_PC: Instruction = Instruction { op: 0x58, name: "PC", arg: ArgType:
 pub const OP_MSIZE: Instruction = Instruction { op: 0x59, name: "MSIZE", arg: ArgType::Void };
 pub const OP_GAS: Instruction = Instruction { op: 0x5a, name: "GAS", arg: ArgType::Void };
 pub const OP_JUMPDEST: Instruction = Instruction { op: 0x5b, name: "JUMPDEST", arg: ArgType::Void };
-pub const OP_PUSH1: Instruction = Instruction { op: 0x60, name: "PUSH1", arg: ArgType::U8 };
-pub const OP_PUSH2: Instruction = Instruction { op: 0x61, name: "PUSH2", arg: ArgType::U16 };
-pub const OP_PUSH3: Instruction = Instruction { op: 0x62, name: "PUSH3", arg: ArgType::U24 };
-pub const OP_PUSH4: Instruction = Instruction { op: 0x63, name: "PUSH4", arg: ArgType::U32 };
-pub const OP_PUSH5: Instruction = Instruction { op: 0x64, name: "PUSH5", arg: ArgType::U40 };
-pub const OP_PUSH6: Instruction = Instruction { op: 0x65, name: "PUSH6", arg: ArgType::U48 };
-pub const OP_PUSH7: Instruction = Instruction { op: 0x66, name: "PUSH7", arg: ArgType::U56 };
-pub const OP_PUSH8: Instruction = Instruction { op: 0x67, name: "PUSH8", arg: ArgType::U64 };
-pub const OP_PUSH9: Instruction = Instruction { op: 0x68, name: "PUSH9", arg: ArgType::U72 };
-pub const OP_PUSH10: Instruction = Instruction { op: 0x69, name: "PUSH10", arg: ArgType::U80 };
-pub const OP_PUSH11: Instruction = Instruction { op: 0x6A, name: "PUSH11", arg: ArgType::U88 };
-pub const OP_PUSH12: Instruction = Instruction { op: 0x6B, name: "PUSH12", arg: ArgType::U96 };
-pub const OP_PUSH13: Instruction = Instruction { op: 0x6C, name: "PUSH13", arg: ArgType::U104 };
-pub const OP_PUSH14: Instruction = Instruction { op: 0x6D, name: "PUSH14", arg: ArgType::U112 };
-pub const OP_PUSH15: Instruction = Instruction { op: 0x6E, name: "PUSH15", arg: ArgType::U120 };
-pub const OP_PUSH16: Instruction = Instruction { op: 0x6F, name: "PUSH16", arg: ArgType::U128 };
-pub const OP_PUSH17: Instruction = Instruction { op: 0x70, name: "PUSH17", arg: ArgType::U136 };
-pub const OP_PUSH18: Instruction = Instruction { op: 0x71, name: "PUSH18", arg: ArgType::U144 };
-pub const OP_PUSH19: Instruction = Instruction { op: 0x72, name: "PUSH19", arg: ArgType::U152 };
-pub const OP_PUSH20: Instruction = Instruction { op: 0x73, name: "PUSH20", arg: ArgType::U160 };
-pub const OP_PUSH21: Instruction = Instruction { op: 0x74, name: "PUSH21", arg: ArgType::U168 };
-pub const OP_PUSH22: Instruction = Instruction { op: 0x75, name: "PUSH22", arg: ArgType::U176 };
-pub const OP_PUSH23: Instruction = Instruction { op: 0x76, name: "PUSH23", arg: ArgType::U184 };
-pub const OP_PUSH24: Instruction = Instruction { op: 0x77, name: "PUSH24", arg: ArgType::U192 };
-pub const OP_PUSH25: Instruction = Instruction { op: 0x78, name: "PUSH25", arg: ArgType::U200 };
-pub const OP_PUSH26: Instruction = Instruction { op: 0x79, name: "PUSH26", arg: ArgType::U208 };
-pub const OP_PUSH27: Instruction = Instruction { op: 0x7A, name: "PUSH27", arg: ArgType::U216 };
-pub const OP_PUSH28: Instruction = Instruction { op: 0x7B, name: "PUSH28", arg: ArgType::U224 };
-pub const OP_PUSH29: Instruction = Instruction { op: 0x7C, name: "PUSH29", arg: ArgType::U232 };
-pub const OP_PUSH30: Instruction = Instruction { op: 0x7D, name: "PUSH30", arg: ArgType::U240 };
-pub const OP_PUSH31: Instruction = Instruction { op: 0x7E, name: "PUSH31", arg: ArgType::U248 };
-pub const OP_PUSH32: Instruction = Instruction { op: 0x7F, name: "PUSH32", arg: ArgType::U256 };
+pub const OP_PUSH1: Instruction = Instruction { op: 0x60, name: "PUSH1", arg: ArgType::U(8) };
+pub const OP_PUSH2: Instruction = Instruction { op: 0x61, name: "PUSH2", arg: ArgType::U(16) };
+pub const OP_PUSH3: Instruction = Instruction { op: 0x62, name: "PUSH3", arg: ArgType::U(24) };
+pub const OP_PUSH4: Instruction = Instruction { op: 0x63, name: "PUSH4", arg: ArgType::U(32) };
+pub const OP_PUSH5: Instruction = Instruction { op: 0x64, name: "PUSH5", arg: ArgType::U(40) };
+pub const OP_PUSH6: Instruction = Instruction { op: 0x65, name: "PUSH6", arg: ArgType::U(48) };
+pub const OP_PUSH7: Instruction = Instruction { op: 0x66, name: "PUSH7", arg: ArgType::U(56) };
+pub const OP_PUSH8: Instruction = Instruction { op: 0x67, name: "PUSH8", arg: ArgType::U(64) };
+pub const OP_PUSH9: Instruction = Instruction { op: 0x68, name: "PUSH9", arg: ArgType::U(72) };
+pub const OP_PUSH10: Instruction = Instruction { op: 0x69, name: "PUSH10", arg: ArgType::U(80) };
+pub const OP_PUSH11: Instruction = Instruction { op: 0x6A, name: "PUSH11", arg: ArgType::U(88) };
+pub const OP_PUSH12: Instruction = Instruction { op: 0x6B, name: "PUSH12", arg: ArgType::U(96) };
+pub const OP_PUSH13: Instruction = Instruction { op: 0x6C, name: "PUSH13", arg: ArgType::U(104) };
+pub const OP_PUSH14: Instruction = Instruction { op: 0x6D, name: "PUSH14", arg: ArgType::U(112) };
+pub const OP_PUSH15: Instruction = Instruction { op: 0x6E, name: "PUSH15", arg: ArgType::U(120) };
+pub const OP_PUSH16: Instruction = Instruction { op: 0x6F, name: "PUSH16", arg: ArgType::U(128) };
+pub const OP_PUSH17: Instruction = Instruction { op: 0x70, name: "PUSH17", arg: ArgType::U(136) };
+pub const OP_PUSH18: Instruction = Instruction { op: 0x71, name: "PUSH18", arg: ArgType::U(144) };
+pub const OP_PUSH19: Instruction = Instruction { op: 0x72, name: "PUSH19", arg: ArgType::U(152) };
+pub const OP_PUSH20: Instruction = Instruction { op: 0x73, name: "PUSH20", arg: ArgType::U(160) };
+pub const OP_PUSH21: Instruction = Instruction { op: 0x74, name: "PUSH21", arg: ArgType::U(168) };
+pub const OP_PUSH22: Instruction = Instruction { op: 0x75, name: "PUSH22", arg: ArgType::U(176) };
+pub const OP_PUSH23: Instruction = Instruction { op: 0x76, name: "PUSH23", arg: ArgType::U(184) };
+pub const OP_PUSH24: Instruction = Instruction { op: 0x77, name: "PUSH24", arg: ArgType::U(192) };
+pub const OP_PUSH25: Instruction = Instruction { op: 0x78, name: "PUSH25", arg: ArgType::U(200) };
+pub const OP_PUSH26: Instruction = Instruction { op: 0x79, name: "PUSH26", arg: ArgType::U(208) };
+pub const OP_PUSH27: Instruction = Instruction { op: 0x7A, name: "PUSH27", arg: ArgType::U(216) };
+pub const OP_PUSH28: Instruction = Instruction { op: 0x7B, name: "PUSH28", arg: ArgType::U(224) };
+pub const OP_PUSH29: Instruction = Instruction { op: 0x7C, name: "PUSH29", arg: ArgType::U(232) };
+pub const OP_PUSH30: Instruction = Instruction { op: 0x7D, name: "PUSH30", arg: ArgType::U(240) };
+pub const OP_PUSH31: Instruction = Instruction { op: 0x7E, name: "PUSH31", arg: ArgType::U(248) };
+pub const OP_PUSH32: Instruction = Instruction { op: 0x7F, name: "PUSH32", arg: ArgType::U(256) };
 pub const OP_DUP1: Instruction = Instruction { op: 0x80, name: "DUP1", arg: ArgType::Void };
 pub const OP_DUP2: Instruction = Instruction { op: 0x81, name: "DUP2", arg: ArgType::Void };
 pub const OP_DUP3: Instruction = Instruction { op: 0x82, name: "DUP3", arg: ArgType::Void };

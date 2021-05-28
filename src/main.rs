@@ -127,6 +127,15 @@ struct InputManager {
     index: usize,
 }
 
+impl ArgType {
+    pub fn size(&self) -> Option<usize> {
+        match self {
+            ArgType::Void => None,
+            ArgType::U(bits) => Some(bits / 8),
+        }
+    }
+}
+
 impl InputManager {
     fn new(contents: &String) -> InputManager {
         let chars = contents.chars();
@@ -164,41 +173,7 @@ impl InputManager {
     }
 
     fn take_arg(&mut self, arg_type: ArgType) -> Result<Option<UInt256>, VMError> {
-        Ok(match arg_type {
-            ArgType::Void => None,
-            ArgType::U8 => Some(self.take(1)?),
-            ArgType::U16 => Some(self.take(2)?),
-            ArgType::U24 => Some(self.take(3)?),
-            ArgType::U32 => Some(self.take(4)?),
-            ArgType::U40 => Some(self.take(5)?),
-            ArgType::U48 => Some(self.take(6)?),
-            ArgType::U56 => Some(self.take(7)?),
-            ArgType::U64 => Some(self.take(8)?),
-            ArgType::U72 => Some(self.take(9)?),
-            ArgType::U80 => Some(self.take(10)?),
-            ArgType::U88 => Some(self.take(11)?),
-            ArgType::U96 => Some(self.take(12)?),
-            ArgType::U104 => Some(self.take(13)?),
-            ArgType::U112 => Some(self.take(14)?),
-            ArgType::U120 => Some(self.take(15)?),
-            ArgType::U128 => Some(self.take(16)?),
-            ArgType::U136 => Some(self.take(17)?),
-            ArgType::U144 => Some(self.take(18)?),
-            ArgType::U152 => Some(self.take(19)?),
-            ArgType::U160 => Some(self.take(20)?),
-            ArgType::U168 => Some(self.take(21)?),
-            ArgType::U176 => Some(self.take(22)?),
-            ArgType::U184 => Some(self.take(23)?),
-            ArgType::U192 => Some(self.take(24)?),
-            ArgType::U200 => Some(self.take(25)?),
-            ArgType::U208 => Some(self.take(26)?),
-            ArgType::U216 => Some(self.take(27)?),
-            ArgType::U224 => Some(self.take(28)?),
-            ArgType::U232 => Some(self.take(29)?),
-            ArgType::U240 => Some(self.take(30)?),
-            ArgType::U248 => Some(self.take(31)?),
-            ArgType::U256 => Some(self.take(32)?),
-        })
+        arg_type.size().map(|size| self.take(size)).transpose()
     }
 }
 
@@ -242,32 +217,12 @@ fn main() {
         Err(error) => println!("ERROR: {:?}", error),
     }
 
-    // while let code = chars.take(2) {
-    // }\
-
-    // chars.take(2);
-    // Read the string
-    // Convert from hex to binary
-    // Read fixed-size
-
-    // let mut parser = { contents.bytes() };
-
-    // println!("With text:\n{}", contents);
-
     // let mut stack = Stack::default();
     // match playground(&mut stack) {
     //     Ok(()) => println!("DONE: {:?}", stack.values),
     //     Err(error) => println!("ERROR: {:?}", error),
     // }
 }
-
-// MVP
-// Take an instruction input buffer
-// pop in a loop
-// Execute
-
-// Add 0x1
-// Push1 0x60
 
 #[cfg(test)]
 mod tests {
