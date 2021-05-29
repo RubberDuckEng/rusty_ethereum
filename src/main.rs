@@ -175,6 +175,12 @@ impl Task<'_> {
                 let result = stack.pop()? < stack.pop()?;
                 stack.push(UInt256::from_bool(result));
             }
+            OP_SHR => {
+                let shift = stack.pop()?;
+                let value = stack.pop()?;
+                let result = value >> shift;
+                stack.push(result);
+            }
             OP_MSTORE => {
                 let offset = stack.pop()?;
                 let value = stack.pop()?;
@@ -203,6 +209,7 @@ impl Task<'_> {
                     .get(index..end)
                     .ok_or(VMError::BadAccess)?;
                 let word = UInt256::from_be_slice(slice);
+                println!("CALLDATALOAD (offset {}) -> {}", offset, word);
                 self.stack.push(word);
             }
             OP_DUP1 => {
@@ -371,7 +378,7 @@ impl InputManager {
 
 fn print_instruction(inst: &Instruction, arg_option: Option<UInt256>) {
     match arg_option {
-        Some(arg) => println!("{:02X}: {} {}", inst.op, inst.name, arg),
+        Some(arg) => println!("{:02X}: {} ({})", inst.op, inst.name, arg),
         None => println!("{:02X}: {}", inst.op, inst.name),
     }
 }

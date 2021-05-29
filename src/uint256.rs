@@ -1,7 +1,7 @@
 use std::fmt;
 
 use std::convert::{TryFrom, TryInto};
-use std::ops::Add;
+use std::ops::{Add, Shr};
 
 #[derive(Default, Copy, Clone, PartialEq, PartialOrd, Eq)]
 pub struct UInt256 {
@@ -42,6 +42,29 @@ impl Add for UInt256 {
         Self {
             low: new_low,
             high: new_high,
+        }
+    }
+}
+
+impl Shr for UInt256 {
+    type Output = Self;
+
+    fn shr(self, shift: Self) -> Self {
+        assert_eq!(shift.high, 0);
+        // Assume it does not module for now and cap at 256.
+        assert!(shift.low < 256);
+        if shift.low > 128 {
+            UInt256 {
+                high: 0,
+                low: self.high >> shift.low - 128,
+            }
+        } else {
+            // This case is more complicated:
+            // Figure out how many bits apply to high vs. low
+            // Mask off any bits needed from high into low.
+            // Shift-right high-half.
+            // Rotate_right low-half.
+            panic!("Not implemented");
         }
     }
 }
@@ -98,22 +121,12 @@ impl UInt256 {
     }
 }
 
-impl fmt::Debug for UInt256 {
+impl fmt::Display for UInt256 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.high == 0 {
             write!(f, "0x{:02X}", self.low)
         } else {
             write!(f, "0x{:X}{:02X}", self.high, self.low)
-        }
-    }
-}
-
-impl fmt::Display for UInt256 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.high == 0 {
-            write!(f, "(0x{:02X})", self.low)
-        } else {
-            write!(f, "(0x{:X}{:02X})", self.high, self.low)
         }
     }
 }
