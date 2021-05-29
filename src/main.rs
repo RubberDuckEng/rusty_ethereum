@@ -23,6 +23,7 @@ enum VMError {
     UNDERFLOW,
     BADOP(u8),
     BADARG,
+    OUTOFBOUNDS,
 }
 
 impl fmt::Debug for VMError {
@@ -31,6 +32,7 @@ impl fmt::Debug for VMError {
             VMError::UNDERFLOW => write!(f, "UNDERFLOW"),
             VMError::BADOP(op) => write!(f, "BADOP(0x{:02X})", op),
             VMError::BADARG => write!(f, "BADARG"),
+            VMError::OUTOFBOUNDS => write!(f, "OUTOFBOUNDS"),
         }
     }
 }
@@ -93,8 +95,8 @@ impl Task {
 }
 
 fn to_usize_range(range: Range<UInt256>) -> Result<Range<usize>, VMError> {
-    let start = usize::try_from(range.start).map_err(|_| VMError::UNDERFLOW)?;
-    let end = usize::try_from(range.end).map_err(|_| VMError::UNDERFLOW)?;
+    let start = usize::try_from(range.start).map_err(|_| VMError::OUTOFBOUNDS)?;
+    let end = usize::try_from(range.end).map_err(|_| VMError::OUTOFBOUNDS)?;
     Ok(start..end)
 }
 
@@ -114,9 +116,8 @@ impl Memory {
     }
 
     fn copy_out(&self, range: Range<UInt256>) -> Result<Vec<u8>, VMError> {
-        let mut out = Vec::new();
         let usize_range = to_usize_range(range)?;
-        out.resize(usize_range.end, 0);
+        let mut out = vec![0u8; usize_range.end - usize_range.start];
         out.copy_from_slice(&self.storage[usize_range]);
         Ok(out)
     }
@@ -182,7 +183,8 @@ impl Task {
             OP_RETURN => {
                 let offset = stack.pop()?;
                 let length = stack.pop()?;
-                self.return_data = self.memory.copy_out(offset..offset + length)?;
+                let range = offset..offset + length;
+                self.return_data = self.memory.copy_out(range)?;
                 self.is_complete = true;
             }
             OP_REVERT => {
@@ -190,7 +192,8 @@ impl Task {
                 // TODO: Should revert all actions?
                 let offset = stack.pop()?;
                 let length = stack.pop()?;
-                self.return_data = self.memory.copy_out(offset..offset + length)?;
+                let range = offset..offset + length;
+                self.return_data = self.memory.copy_out(range)?;
                 self.is_complete = true;
             }
             // All push instructions:
