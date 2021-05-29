@@ -145,6 +145,10 @@ impl Task<'_> {
                 let result = stack.pop()? + stack.pop()?;
                 stack.push(result);
             }
+            OP_LT => {
+                let result = stack.pop()? < stack.pop()?;
+                stack.push(UInt256::from_bool(result));
+            }
             OP_MSTORE => {
                 let offset = stack.pop()?;
                 let value = stack.pop()?;
@@ -152,6 +156,15 @@ impl Task<'_> {
             }
             OP_CALLVALUE => {
                 stack.push(self.message.value);
+            }
+            OP_CALLDATASIZE => {
+                stack.push(
+                    self.message
+                        .data
+                        .len()
+                        .try_into()
+                        .map_err(|_| VMError::OUTOFBOUNDS)?,
+                );
             }
             OP_DUP1 => {
                 stack.push(stack.peek(0)?);
@@ -341,20 +354,29 @@ fn main_disassemble() {
     }
 }
 
-fn send_message_to_contract(message: Message, wrapper: InputManager) -> Result<(), VMError> {
+#[derive(Clone, PartialEq, Eq, Debug)]
+enum ContractError {
+    Revert(Vec<u8>),
+    InternalError(VMError),
+}
+
+fn send_message_to_contract(message: Message, wrapper: InputManager) -> Result<(), ContractError> {
     let mut task = Task::new(wrapper, &message);
     let contract_bytes;
-    match task.execute()? {
-        TaskResult::Revert(data) => {
-            println!("Revert! Data: {:02X?}", data);
-            return Ok(());
-        }
+    match task
+        .execute()
+        .map_err(|e| ContractError::InternalError(e))?
+    {
+        TaskResult::Revert(data) => return Err(ContractError::Revert(data)),
         TaskResult::Return(bytes) => contract_bytes = bytes,
     }
     println!("Got contract, executing!");
     let contract = InputManager::from_bytes(contract_bytes);
     let mut task = Task::new(contract, &message);
-    match task.execute()? {
+    match task
+        .execute()
+        .map_err(|e| ContractError::InternalError(e))?
+    {
         TaskResult::Revert(data) => {
             println!("Revert! Data: {:02X?}", data);
             return Ok(());

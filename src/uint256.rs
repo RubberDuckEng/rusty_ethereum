@@ -3,7 +3,7 @@ use std::fmt;
 use std::convert::{TryFrom, TryInto};
 use std::ops::Add;
 
-#[derive(Default, Copy, Clone, PartialEq, Eq)]
+#[derive(Default, Copy, Clone, PartialEq, PartialOrd, Eq)]
 pub struct UInt256 {
     high: u128,
     low: u128,
@@ -12,6 +12,21 @@ pub struct UInt256 {
 impl UInt256 {
     pub const ONE: UInt256 = UInt256 { high: 0, low: 1 };
     pub const ZERO: UInt256 = UInt256 { high: 0, low: 0 };
+
+    pub fn from_bool(value: bool) -> UInt256 {
+        if value {
+            UInt256::ONE
+        } else {
+            UInt256::ZERO
+        }
+    }
+
+    pub fn from_u128(value: u128) -> UInt256 {
+        UInt256 {
+            low: value,
+            high: 0,
+        }
+    }
 }
 
 impl Add for UInt256 {
@@ -45,19 +60,14 @@ impl TryFrom<UInt256> for usize {
     }
 }
 
-// impl TryInto<usize> for UInt256 {
-//     type Error = std::num::TryFromIntError;
+impl TryFrom<usize> for UInt256 {
+    type Error = std::num::TryFromIntError;
 
-//     fn try_into(self) -> Result<usize, Self::Error> {
-//         if self.high != 0 {
-//             // TryFromIntError is not directly construtable?
-//             // https://stackoverflow.com/questions/54374979/tryfrominterror-usage
-//             u128::MAX.try_into()
-//         } else {
-//             self.low.try_into()
-//         }
-//     }
-// }
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        let low: u128 = u128::try_from(value)?;
+        Ok(UInt256 { low: low, high: 0 })
+    }
+}
 
 fn u128_from_be_slice(bytes: &[u8]) -> u128 {
     let mut word: u128 = 0;
@@ -105,5 +115,19 @@ impl fmt::Display for UInt256 {
         } else {
             write!(f, "(0x{:X}{:02X})", self.high, self.low)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::UInt256;
+    #[test]
+    fn ordering_works() {
+        assert!(UInt256::ONE > UInt256::ZERO);
+        assert!(UInt256::ZERO < UInt256::ONE);
+
+        let bigger = UInt256 { high: 2, low: 1 };
+        let smaller = UInt256 { high: 1, low: 2 };
+        assert!(bigger > smaller);
     }
 }
