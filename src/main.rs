@@ -74,22 +74,20 @@ struct Message {
     data: Vec<UInt256>,
 }
 
-#[derive(Default)]
-struct Task {
-    message: Message, // This ends up being a stack I think?
+struct Task<'a> {
+    message: &'a Message, // This ends up being a stack I think?
     stack: Stack,
     memory: Memory,
     input: InputManager,
-    return_data: Vec<u8>,
-    is_complete: bool,
 }
 
-impl Task {
-    fn new(input: InputManager, message: Message) -> Task {
+impl Task<'_> {
+    fn new(input: InputManager, message: &Message) -> Task {
         Task {
             input: input,
             message: message,
-            ..Task::default()
+            stack: Stack::default(),
+            memory: Memory::default(),
         }
     }
 }
@@ -123,13 +121,23 @@ impl Memory {
     }
 }
 
-impl Task {
+enum InstructionResult {
+    Continue,
+    Return(Vec<u8>),
+    Revert(Vec<u8>),
+}
+
+enum TaskResult {
+    Return(Vec<u8>),
+    Revert(Vec<u8>),
+}
+
+impl Task<'_> {
     fn execute_single_instruction(
         &mut self,
         instruction: &Instruction,
         arg_option: Option<UInt256>,
-    ) -> Result<(), VMError> {
-        assert!(!self.is_complete);
+    ) -> Result<InstructionResult, VMError> {
         let stack = &mut self.stack;
         print_instruction(instruction, arg_option);
         match *instruction {
@@ -171,7 +179,9 @@ impl Task {
                 let destination = stack.pop()?;
                 let condition = stack.pop()?;
                 if condition == UInt256::ZERO {
+                    let from = self.input.index;
                     self.input.index = destination.try_into().map_err(|_| VMError::UNDERFLOW)?;
+                    println!("Jumped from {} to {}", from, self.input.index);
                 }
             }
             OP_JUMPDEST => {
@@ -184,8 +194,7 @@ impl Task {
                 let offset = stack.pop()?;
                 let length = stack.pop()?;
                 let range = offset..offset + length;
-                self.return_data = self.memory.copy_out(range)?;
-                self.is_complete = true;
+                return Ok(InstructionResult::Return(self.memory.copy_out(range)?));
             }
             OP_REVERT => {
                 // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-140.md
@@ -193,8 +202,7 @@ impl Task {
                 let offset = stack.pop()?;
                 let length = stack.pop()?;
                 let range = offset..offset + length;
-                self.return_data = self.memory.copy_out(range)?;
-                self.is_complete = true;
+                return Ok(InstructionResult::Revert(self.memory.copy_out(range)?));
             }
             // All push instructions:
             Instruction {
@@ -207,26 +215,28 @@ impl Task {
                 return Err(VMError::BADOP(instruction.op));
             }
         }
-        Ok(())
+        return Ok(InstructionResult::Continue);
     }
-    fn take_op(&mut self) -> Option<u8> {
-        if self.is_complete {
-            None
-        } else {
-            self.input.take_op()
-        }
-    }
-    fn execute(&mut self) -> Result<(), VMError> {
+    fn execute(&mut self) -> Result<TaskResult, VMError> {
         let ops: HashMap<_, _> = INSTRUCTIONS
             .iter()
             .map(|instruction| (instruction.op, instruction))
             .collect();
-        while let Some(op) = self.take_op() {
+        while let Some(op) = self.input.take_op() {
             let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
             let arg_option = self.input.take_arg(inst.arg)?;
-            self.execute_single_instruction(inst, arg_option)?;
+            match self.execute_single_instruction(inst, arg_option)? {
+                InstructionResult::Revert(data) => {
+                    return Ok(TaskResult::Revert(data));
+                }
+                InstructionResult::Return(data) => {
+                    return Ok(TaskResult::Return(data));
+                }
+                InstructionResult::Continue => {}
+            }
         }
-        Ok(())
+        // Is this right?  This is "out of instructions". Maybe BADOP?
+        Err(VMError::UNDERFLOW)
     }
 }
 
@@ -246,7 +256,7 @@ impl ArgType {
 }
 
 impl InputManager {
-    fn new(contents: &String) -> InputManager {
+    fn from_string(contents: &String) -> InputManager {
         let chars = contents.chars();
         let chunks = chars.chunks(2);
         let ops = chunks
@@ -254,6 +264,15 @@ impl InputManager {
             .map(|chunk| u8::from_str_radix(&chunk.collect::<String>(), 16).expect("vaild hex"))
             .collect::<Vec<u8>>();
         InputManager { ops, index: 0 }
+    }
+
+    fn from_bytes(ops: Vec<u8>) -> InputManager {
+        InputManager { ops, index: 0 }
+    }
+
+    fn from_file(filename: &str) -> InputManager {
+        let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
+        InputManager::from_string(&contents)
     }
 
     fn take_u8(&mut self) -> Result<u8, VMError> {
@@ -310,13 +329,11 @@ fn dissemble(input: &mut InputManager) -> Result<(), VMError> {
 
 fn main_disassemble() {
     // let filename = "bin/fixtures/Counter.bin";
-    // println!("In file {}", filename);
-    // let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
+    // let mut input = InputManager::from_file(filename);
 
     let filename = "fixtures/counter_bytecode_8_0_1_remix.json";
     let result = read_remix_json(filename);
-
-    let mut input = InputManager::new(&result.object);
+    let mut input = InputManager::from_string(&result.object);
 
     match dissemble(&mut input) {
         Ok(()) => println!("DONE"),
@@ -324,37 +341,45 @@ fn main_disassemble() {
     }
 }
 
-fn main_execute() {
-    let filename = "bin/fixtures/Counter.bin";
-    println!("In file {}", filename);
-    let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
-    let input = InputManager::new(&contents);
+fn send_message_to_contract(message: Message, wrapper: InputManager) -> Result<(), VMError> {
+    let mut task = Task::new(wrapper, &message);
+    let contract_bytes;
+    match task.execute()? {
+        TaskResult::Revert(data) => {
+            println!("Revert! Data: {:02X?}", data);
+            return Ok(());
+        }
+        TaskResult::Return(bytes) => contract_bytes = bytes,
+    }
+    println!("Got contract, executing!");
+    let contract = InputManager::from_bytes(contract_bytes);
+    let mut task = Task::new(contract, &message);
+    match task.execute()? {
+        TaskResult::Revert(data) => {
+            println!("Revert! Data: {:02X?}", data);
+            return Ok(());
+        }
+        TaskResult::Return(data) => {
+            println!("return Data: {:02X?}", data);
+            return Ok(());
+        }
+    }
+}
 
-    // let instructions: Vec<u8> = vec![OP_PUSH1.op, 1, OP_PUSH1.op, 2, OP_ADD.op];
-    // let input = InputManager {
-    //     ops: instructions,
-    //     index: 0,
-    // };
+fn main() {
+    // main_disassemble();
 
     let message = Message {
         value: UInt256::ONE, // Non-zero wei.
         caller: UInt256::ZERO,
         ..Message::default()
     };
-
-    let mut task = Task::new(input, message);
-    match task.execute() {
-        Ok(()) => println!(
-            "DONE: Stack: {:?}, Return Data: {:?}",
-            task.stack.values, task.return_data
-        ),
+    let filename = "bin/fixtures/Counter.bin";
+    let contract = InputManager::from_file(&filename);
+    match send_message_to_contract(message, contract) {
+        Ok(()) => println!("DONE!"),
         Err(error) => println!("ERROR: {:?}", error),
     }
-}
-
-fn main() {
-    // main_disassemble();
-    main_execute();
 }
 
 #[cfg(test)]
