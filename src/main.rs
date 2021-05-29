@@ -10,6 +10,8 @@ use std::fs;
 use std::iter::Iterator;
 use std::ops::Range;
 
+use sha3::Digest;
+
 mod instructions;
 mod remix_json;
 mod uint256;
@@ -77,7 +79,25 @@ struct Memory {
 struct Message {
     value: UInt256, // message funds in wei
     caller: UInt256,
-    data: Vec<UInt256>,
+    // First four bytes should be signature of method being called, e.g.
+    // data[..4] = bytes4(keccak256(“add(uint256,uint256)”));
+    data: Vec<u8>,
+}
+
+impl Message {
+    fn new_call(method_name: &str) -> Message {
+        let mut data = vec![0u8; 32];
+        // TODO: I suspect this encoding is incorrect.
+        // This has not been tested!
+        let encoded_name = sha3::Sha3_256::digest(method_name.as_bytes());
+        data[..4].copy_from_slice(&encoded_name[..4]);
+
+        Message {
+            value: UInt256::ONE, // Non-zero wei.
+            caller: UInt256::ZERO,
+            data: data,
+        }
+    }
 }
 
 struct Task<'a> {
@@ -172,6 +192,18 @@ impl Task<'_> {
                         .map_err(|_| VMError::OutOfBounds)?,
                 );
             }
+            OP_CALLDATALOAD => {
+                let offset = stack.pop()?;
+                let index: usize = offset.try_into().map_err(|_| VMError::BadAccess)?;
+                let end: usize = index + 32;
+                let slice = self
+                    .message
+                    .data
+                    .get(index..end)
+                    .ok_or(VMError::BadAccess)?;
+                let word = UInt256::from_be_slice(slice);
+                self.stack.push(word);
+            }
             OP_DUP1 => {
                 stack.push(stack.peek(0)?);
             }
@@ -239,6 +271,10 @@ impl Task<'_> {
         return Ok(InstructionResult::Continue);
     }
     fn execute(&mut self) -> Result<TaskResult, VMError> {
+        // Does INSTRUCTIONS, take_op, inst and arg_option just
+        // belong in some sort of Disasembler class?
+        // Then the Disassembler wouldn't be responsible for erroring
+        // on bad opcodes, but rather just returning an Unknown Op?
         let ops: HashMap<_, _> = INSTRUCTIONS
             .iter()
             .map(|instruction| (instruction.op, instruction))
@@ -394,11 +430,10 @@ fn send_message_to_contract(message: Message, wrapper: InputManager) -> Result<(
 fn main() {
     // main_disassemble();
 
-    let message = Message {
-        value: UInt256::ONE, // Non-zero wei.
-        caller: UInt256::ZERO,
-        ..Message::default()
-    };
+    // Method function names:
+    // https://docs.soliditylang.org/en/develop/abi-spec.html
+    // sha256("name(args..,returns)")
+    let message = Message::new_call("get(uint256)");
     let filename = "bin/fixtures/Counter.bin";
     let contract = InputManager::from_file(&filename);
     match send_message_to_contract(message, contract) {
