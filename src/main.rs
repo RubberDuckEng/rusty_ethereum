@@ -175,6 +175,10 @@ impl Task<'_> {
                 let result = stack.pop()? < stack.pop()?;
                 stack.push(UInt256::from_bool(result));
             }
+            OP_EQ => {
+                let result = stack.pop()? == stack.pop()?;
+                stack.push(UInt256::from_bool(result));
+            }
             OP_SHR => {
                 let shift = stack.pop()?;
                 let value = stack.pop()?;
