@@ -20,19 +20,25 @@ use crate::uint256::*;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum VMError {
-    UNDERFLOW,
-    BADOP(u8),
-    BADARG,
-    OUTOFBOUNDS,
+    StackUnderflow,
+    EndOfInstructions,
+    BadAccess,
+    BadOp(u8),
+    BadArg,
+    OutOfBounds,
+    TypeConversion,
 }
 
 impl fmt::Debug for VMError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            VMError::UNDERFLOW => write!(f, "UNDERFLOW"),
-            VMError::BADOP(op) => write!(f, "BADOP(0x{:02X})", op),
-            VMError::BADARG => write!(f, "BADARG"),
-            VMError::OUTOFBOUNDS => write!(f, "OUTOFBOUNDS"),
+            VMError::StackUnderflow => write!(f, "STACK_UNDERFLOW"),
+            VMError::BadOp(op) => write!(f, "BadOp(0x{:02X})", op),
+            VMError::BadArg => write!(f, "BadArg"),
+            VMError::BadAccess => write!(f, "BadAccess"),
+            VMError::OutOfBounds => write!(f, "OutOfBounds"),
+            VMError::EndOfInstructions => write!(f, "END_OF_INSTRUCTIONS"),
+            VMError::TypeConversion => write!(f, "TypeConversion"),
         }
     }
 }
@@ -53,12 +59,12 @@ impl Stack {
         if index < self.values.len() {
             Ok(self.values[self.values.len() - index - 1])
         } else {
-            Err(VMError::UNDERFLOW)
+            Err(VMError::StackUnderflow)
         }
     }
 
     fn pop(&mut self) -> Result<UInt256, VMError> {
-        return self.values.pop().ok_or(VMError::UNDERFLOW);
+        return self.values.pop().ok_or(VMError::StackUnderflow);
     }
 }
 
@@ -93,8 +99,8 @@ impl Task<'_> {
 }
 
 fn to_usize_range(range: Range<UInt256>) -> Result<Range<usize>, VMError> {
-    let start = usize::try_from(range.start).map_err(|_| VMError::OUTOFBOUNDS)?;
-    let end = usize::try_from(range.end).map_err(|_| VMError::OUTOFBOUNDS)?;
+    let start = usize::try_from(range.start).map_err(|_| VMError::OutOfBounds)?;
+    let end = usize::try_from(range.end).map_err(|_| VMError::OutOfBounds)?;
     Ok(start..end)
 }
 
@@ -106,7 +112,7 @@ impl Memory {
     }
 
     fn store(&mut self, offset: UInt256, value: UInt256) -> Result<(), VMError> {
-        let index: usize = offset.try_into().map_err(|_| VMError::UNDERFLOW)?;
+        let index: usize = offset.try_into().map_err(|_| VMError::BadAccess)?;
         let end = index + 32;
         self.ensure_size(end);
         value.to_be_bytes(&mut self.storage[index..end]);
@@ -163,7 +169,7 @@ impl Task<'_> {
                         .data
                         .len()
                         .try_into()
-                        .map_err(|_| VMError::OUTOFBOUNDS)?,
+                        .map_err(|_| VMError::OutOfBounds)?,
                 );
             }
             OP_DUP1 => {
@@ -193,7 +199,9 @@ impl Task<'_> {
                 let condition = stack.pop()?;
                 if condition == UInt256::ZERO {
                     let from = self.input.index;
-                    self.input.index = destination.try_into().map_err(|_| VMError::UNDERFLOW)?;
+                    self.input.index = destination
+                        .try_into()
+                        .map_err(|_| VMError::TypeConversion)?;
                     println!("Jumped from {} to {}", from, self.input.index);
                 }
             }
@@ -221,11 +229,11 @@ impl Task<'_> {
             Instruction {
                 op: 0x60..=0x7F, ..
             } => {
-                let arg = arg_option.ok_or(VMError::BADARG)?;
+                let arg = arg_option.ok_or(VMError::BadArg)?;
                 stack.push(arg);
             }
             _ => {
-                return Err(VMError::BADOP(instruction.op));
+                return Err(VMError::BadOp(instruction.op));
             }
         }
         return Ok(InstructionResult::Continue);
@@ -236,7 +244,7 @@ impl Task<'_> {
             .map(|instruction| (instruction.op, instruction))
             .collect();
         while let Some(op) = self.input.take_op() {
-            let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
+            let inst = ops.get(&op).ok_or(VMError::BadOp(op))?;
             let arg_option = self.input.take_arg(inst.arg)?;
             match self.execute_single_instruction(inst, arg_option)? {
                 InstructionResult::Revert(data) => {
@@ -248,8 +256,7 @@ impl Task<'_> {
                 InstructionResult::Continue => {}
             }
         }
-        // Is this right?  This is "out of instructions". Maybe BADOP?
-        Err(VMError::UNDERFLOW)
+        Err(VMError::EndOfInstructions)
     }
 }
 
@@ -294,7 +301,7 @@ impl InputManager {
             self.index += 1;
             Ok(value)
         } else {
-            Err(VMError::BADARG)
+            Err(VMError::BadArg)
         }
     }
 
@@ -305,7 +312,7 @@ impl InputManager {
             self.index += size;
             Ok(UInt256::from_be_slice(bytes))
         } else {
-            Err(VMError::BADARG)
+            Err(VMError::BadArg)
         }
     }
 
@@ -332,7 +339,7 @@ fn dissemble(input: &mut InputManager) -> Result<(), VMError> {
         .collect();
 
     while let Some(op) = input.take_op() {
-        let inst = ops.get(&op).ok_or(VMError::BADOP(op))?;
+        let inst = ops.get(&op).ok_or(VMError::BadOp(op))?;
         let arg_option = input.take_arg(inst.arg)?;
         print_instruction(inst, arg_option);
     }
@@ -362,14 +369,13 @@ enum ContractError {
 
 fn send_message_to_contract(message: Message, wrapper: InputManager) -> Result<(), ContractError> {
     let mut task = Task::new(wrapper, &message);
-    let contract_bytes;
-    match task
+    let contract_bytes = match task
         .execute()
         .map_err(|e| ContractError::InternalError(e))?
     {
         TaskResult::Revert(data) => return Err(ContractError::Revert(data)),
-        TaskResult::Return(bytes) => contract_bytes = bytes,
-    }
+        TaskResult::Return(bytes) => bytes,
+    };
     println!("Got contract, executing!");
     let contract = InputManager::from_bytes(contract_bytes);
     let mut task = Task::new(contract, &message);
@@ -377,10 +383,7 @@ fn send_message_to_contract(message: Message, wrapper: InputManager) -> Result<(
         .execute()
         .map_err(|e| ContractError::InternalError(e))?
     {
-        TaskResult::Revert(data) => {
-            println!("Revert! Data: {:02X?}", data);
-            return Ok(());
-        }
+        TaskResult::Revert(data) => return Err(ContractError::Revert(data)),
         TaskResult::Return(data) => {
             println!("return Data: {:02X?}", data);
             return Ok(());
@@ -401,13 +404,5 @@ fn main() {
     match send_message_to_contract(message, contract) {
         Ok(()) => println!("DONE!"),
         Err(error) => println!("ERROR: {:?}", error),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
     }
 }
