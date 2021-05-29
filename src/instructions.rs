@@ -15,20 +15,6 @@ pub struct Instruction {
     pub arg: ArgType,
 }
 
-impl Instruction {
-    fn new(op: u8, name: &'static str) -> Instruction {
-        Instruction {
-            op,
-            name,
-            arg: ArgType::Void,
-        }
-    }
-
-    fn new_with_arg(op: u8, name: &'static str, arg: ArgType) -> Instruction {
-        Instruction { op, name, arg }
-    }
-}
-
 pub const OP_STOP: Instruction = Instruction { op: 0x00, name: "STOP", arg: ArgType::Void };
 pub const OP_ADD: Instruction = Instruction { op: 0x01, name: "ADD", arg: ArgType::Void };
 pub const OP_MUL: Instruction = Instruction { op: 0x02, name: "MUL", arg: ArgType::Void };
