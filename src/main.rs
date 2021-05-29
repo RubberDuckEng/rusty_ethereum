@@ -93,7 +93,7 @@ impl Message {
         data[..4].copy_from_slice(&encoded_name[..4]);
 
         Message {
-            value: UInt256::ONE, // Non-zero wei.
+            value: UInt256::ZERO, // Zero wei?
             caller: UInt256::ZERO,
             data: data,
         }
@@ -181,6 +181,7 @@ impl Task<'_> {
                 self.memory.store(offset, value)?;
             }
             OP_CALLVALUE => {
+                println!("CALLVALUE -> {}", self.message.value);
                 stack.push(self.message.value);
             }
             OP_CALLDATASIZE => {
@@ -208,6 +209,7 @@ impl Task<'_> {
                 stack.push(stack.peek(0)?);
             }
             OP_ISZERO => {
+                println!("ISZERO -> {}", stack.peek(0)? == UInt256::ZERO);
                 if stack.peek(0)? == UInt256::ZERO {
                     stack.push(UInt256::ONE)
                 } else {
@@ -221,7 +223,7 @@ impl Task<'_> {
                 // 	memory[destOffset:destOffset+length] = address(this).code[offset: offset + length]
                 let from = to_usize_range(offset..offset + length)?;
                 let to = to_usize_range(dest_offset..dest_offset + length)?;
-                println!("{:?} {:?} {:?}", from, to, self.input.ops.len());
+                println!("CODECOPY from {:?} to {:?}", from, to);
                 // TODO: Does this index from input[0] or $PC or something else?
                 self.memory.ensure_size(to.end);
                 self.memory.storage[to].copy_from_slice(&self.input.ops[from]);
@@ -229,7 +231,13 @@ impl Task<'_> {
             OP_JUMPI => {
                 let destination = stack.pop()?;
                 let condition = stack.pop()?;
-                if condition == UInt256::ZERO {
+                let is_truthy = condition != UInt256::ZERO;
+                println!(
+                    "JUMPI (condition: {} is_truthy: {})",
+                    condition,
+                    condition != UInt256::ZERO
+                );
+                if is_truthy {
                     let from = self.input.index;
                     self.input.index = destination
                         .try_into()
