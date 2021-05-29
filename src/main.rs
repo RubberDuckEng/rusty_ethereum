@@ -67,7 +67,7 @@ struct Memory {
 
 #[derive(Default)]
 struct Message {
-    value: UInt256,
+    value: UInt256, // message funds in wei
     caller: UInt256,
     data: Vec<UInt256>,
 }
@@ -83,31 +83,40 @@ struct Task {
 }
 
 impl Task {
-    fn new(input: InputManager) -> Task {
+    fn new(input: InputManager, message: Message) -> Task {
         Task {
             input: input,
+            message: message,
             ..Task::default()
         }
     }
 }
 
+fn to_usize_range(range: Range<UInt256>) -> Result<Range<usize>, VMError> {
+    let start = usize::try_from(range.start).map_err(|_| VMError::UNDERFLOW)?;
+    let end = usize::try_from(range.end).map_err(|_| VMError::UNDERFLOW)?;
+    Ok(start..end)
+}
+
 impl Memory {
-    fn store(&mut self, offset: UInt256, value: UInt256) -> Result<(), VMError> {
-        let index: usize = offset.try_into().map_err(|_| VMError::UNDERFLOW)?;
-        let end = index + 32;
+    fn ensure_size(&mut self, end: usize) {
         if end > self.storage.len() {
             self.storage.resize(end, 0);
         }
+    }
 
+    fn store(&mut self, offset: UInt256, value: UInt256) -> Result<(), VMError> {
+        let index: usize = offset.try_into().map_err(|_| VMError::UNDERFLOW)?;
+        let end = index + 32;
+        self.ensure_size(end);
         value.to_be_bytes(&mut self.storage[index..end]);
         Ok(())
     }
 
     fn copy_out(&self, range: Range<UInt256>) -> Result<Vec<u8>, VMError> {
         let mut out = Vec::new();
-        let start = usize::try_from(range.start).map_err(|_| VMError::UNDERFLOW)?;
-        let end = usize::try_from(range.end).map_err(|_| VMError::UNDERFLOW)?;
-        let usize_range = start..end;
+        let usize_range = to_usize_range(range)?;
+        out.resize(usize_range.end, 0);
         out.copy_from_slice(&self.storage[usize_range]);
         Ok(out)
     }
@@ -145,6 +154,18 @@ impl Task {
                     stack.push(UInt256::ZERO)
                 }
             }
+            OP_CODECOPY => {
+                let dest_offset = stack.pop()?;
+                let offset = stack.pop()?;
+                let length = stack.pop()?;
+                // 	memory[destOffset:destOffset+length] = address(this).code[offset: offset + length]
+                let from = to_usize_range(offset..offset + length)?;
+                let to = to_usize_range(dest_offset..dest_offset + length)?;
+                println!("{:?} {:?} {:?}", from, to, self.input.ops.len());
+                // TODO: Does this index from input[0] or $PC or something else?
+                self.memory.ensure_size(to.end);
+                self.memory.storage[to].copy_from_slice(&self.input.ops[from]);
+            }
             OP_JUMPI => {
                 let destination = stack.pop()?;
                 let condition = stack.pop()?;
@@ -152,8 +173,21 @@ impl Task {
                     self.input.index = destination.try_into().map_err(|_| VMError::UNDERFLOW)?;
                 }
             }
+            OP_JUMPDEST => {
+                // Metadata to annotate possible jump destination, no action.
+            }
+            OP_POP => {
+                stack.pop()?;
+            }
+            OP_RETURN => {
+                let offset = stack.pop()?;
+                let length = stack.pop()?;
+                self.return_data = self.memory.copy_out(offset..offset + length)?;
+                self.is_complete = true;
+            }
             OP_REVERT => {
                 // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-140.md
+                // TODO: Should revert all actions?
                 let offset = stack.pop()?;
                 let length = stack.pop()?;
                 self.return_data = self.memory.copy_out(offset..offset + length)?;
@@ -299,7 +333,13 @@ fn main_execute() {
     //     index: 0,
     // };
 
-    let mut task = Task::new(input);
+    let message = Message {
+        value: UInt256::ONE, // Non-zero wei.
+        caller: UInt256::ZERO,
+        ..Message::default()
+    };
+
+    let mut task = Task::new(input, message);
     match task.execute() {
         Ok(()) => println!(
             "DONE: Stack: {:?}, Return Data: {:?}",
