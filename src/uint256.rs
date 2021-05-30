@@ -2,7 +2,7 @@ use itertools::Itertools;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::iter::Iterator;
-use std::ops::{Add, Shr};
+use std::ops::{Add, Shr, Sub};
 
 #[derive(Default, Copy, Clone, PartialEq, PartialOrd, Eq)]
 pub struct UInt256 {
@@ -56,6 +56,20 @@ impl Add for UInt256 {
         Self {
             low: new_low,
             high: new_high,
+        }
+    }
+}
+
+impl Sub for UInt256 {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        assert_eq!(self.high, 0);
+        assert_eq!(other.high, 0);
+        println!("Sub for UInt256 is a hack!");
+        Self {
+            low: self.low.checked_sub(other.low).expect("works"),
+            high: 0,
         }
     }
 }

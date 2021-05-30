@@ -60,7 +60,17 @@ impl Stack {
 
 #[derive(Default)]
 struct Memory {
-    storage: Vec<u8>,
+    bytes: Vec<u8>,
+}
+
+#[derive(Default)]
+struct Storage {}
+
+impl Storage {
+    fn load(&self, key: UInt256) -> UInt256 {
+        println!("Storage.load({}) not implemented, returning 0", key);
+        UInt256::ZERO
+    }
 }
 
 pub struct Task<'a> {
@@ -68,6 +78,7 @@ pub struct Task<'a> {
     stack: Stack,
     memory: Memory,
     input: InputManager,
+    storage: Storage,
 }
 
 impl Task<'_> {
@@ -77,6 +88,7 @@ impl Task<'_> {
             message: message,
             stack: Stack::default(),
             memory: Memory::default(),
+            storage: Storage::default(),
         }
     }
 }
@@ -89,23 +101,28 @@ fn to_usize_range(range: Range<UInt256>) -> Result<Range<usize>, VMError> {
 
 impl Memory {
     fn ensure_size(&mut self, end: usize) {
-        if end > self.storage.len() {
-            self.storage.resize(end, 0);
+        if end > self.bytes.len() {
+            self.bytes.resize(end, 0);
         }
+    }
+    fn load(&self, offset: UInt256) -> Result<UInt256, VMError> {
+        let index: usize = offset.try_into().map_err(|_| VMError::BadAccess)?;
+        let end = index + 32;
+        Ok(UInt256::from_be_slice(&self.bytes[index..end]))
     }
 
     fn store(&mut self, offset: UInt256, value: UInt256) -> Result<(), VMError> {
         let index: usize = offset.try_into().map_err(|_| VMError::BadAccess)?;
         let end = index + 32;
         self.ensure_size(end);
-        value.to_be_bytes(&mut self.storage[index..end]);
+        value.to_be_bytes(&mut self.bytes[index..end]);
         Ok(())
     }
 
     fn copy_out(&self, range: Range<UInt256>) -> Result<Vec<u8>, VMError> {
         let usize_range = to_usize_range(range)?;
         let mut out = vec![0u8; usize_range.end - usize_range.start];
-        out.copy_from_slice(&self.storage[usize_range]);
+        out.copy_from_slice(&self.bytes[usize_range]);
         Ok(out)
     }
 }
@@ -122,6 +139,13 @@ enum TaskResult {
 }
 
 impl Task<'_> {
+    fn jump_to(&mut self, new_pc: UInt256) -> Result<(), VMError> {
+        let from = self.input.index;
+        self.input.index = new_pc.try_into().map_err(|_| VMError::TypeConversion)?;
+        println!("Jumped from {:02X} to {:02X}", from, self.input.index);
+        Ok(())
+    }
+
     fn execute_single_instruction(
         &mut self,
         instruction: &Instruction,
@@ -132,6 +156,10 @@ impl Task<'_> {
         match *instruction {
             OP_ADD => {
                 let result = stack.pop()? + stack.pop()?;
+                stack.push(result);
+            }
+            OP_SUB => {
+                let result = stack.pop()? - stack.pop()?;
                 stack.push(result);
             }
             OP_LT => {
@@ -150,6 +178,11 @@ impl Task<'_> {
                 let result = value >> shift;
                 println!("SHR {} >> {} = {}", value, shift, result);
                 stack.push(result);
+            }
+            OP_MLOAD => {
+                let offset = stack.pop()?;
+                let value = self.memory.load(offset)?;
+                stack.push(value);
             }
             OP_MSTORE => {
                 let offset = stack.pop()?;
@@ -185,6 +218,15 @@ impl Task<'_> {
             OP_DUP1 => {
                 stack.push(stack.peek(0)?);
             }
+            OP_DUP2 => {
+                stack.push(stack.peek(1)?);
+            }
+            OP_SWAP1 => {
+                stack.values.swap(0, 1);
+            }
+            OP_SWAP2 => {
+                stack.values.swap(0, 2);
+            }
             OP_ISZERO => {
                 println!("ISZERO -> {}", stack.peek(0)? == UInt256::ZERO);
                 if stack.peek(0)? == UInt256::ZERO {
@@ -203,7 +245,16 @@ impl Task<'_> {
                 println!("CODECOPY from {:?} to {:?}", from, to);
                 // TODO: Does this index from input[0] or $PC or something else?
                 self.memory.ensure_size(to.end);
-                self.memory.storage[to].copy_from_slice(&self.input.ops[from]);
+                self.memory.bytes[to].copy_from_slice(&self.input.ops[from]);
+            }
+            OP_SLOAD => {
+                let key = stack.pop()?;
+                let value = self.storage.load(key);
+                stack.push(value);
+            }
+            OP_JUMP => {
+                let destination = stack.pop()?;
+                self.jump_to(destination)?;
             }
             OP_JUMPI => {
                 let destination = stack.pop()?;
@@ -215,11 +266,7 @@ impl Task<'_> {
                     condition != UInt256::ZERO
                 );
                 if is_truthy {
-                    let from = self.input.index;
-                    self.input.index = destination
-                        .try_into()
-                        .map_err(|_| VMError::TypeConversion)?;
-                    println!("Jumped from {} to {}", from, self.input.index);
+                    self.jump_to(destination)?;
                 }
             }
             OP_JUMPDEST => {
