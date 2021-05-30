@@ -2,7 +2,7 @@ use itertools::Itertools;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::iter::Iterator;
-use std::ops::{Add, Not, Shr, Sub};
+use std::ops::{Add, Not, Shl, Shr, Sub};
 
 #[derive(Default, Copy, Clone, PartialEq, PartialOrd, Eq)]
 pub struct UInt256 {
@@ -89,8 +89,8 @@ impl Shr for UInt256 {
     type Output = Self;
 
     fn shr(self, shift: Self) -> Self {
+        // assert not shifting more than 256 (could return 0x0 instead)
         assert_eq!(shift.high, 0);
-        // Assume it does not module for now and cap at 256.
         assert!(shift.low < 256);
         if shift.low > 128 {
             println!("{} >> {}", self.high, shift.low - 128);
@@ -104,6 +104,25 @@ impl Shr for UInt256 {
             // Mask off any bits needed from high into low.
             // Shift-right high-half.
             // Rotate_right low-half.
+            panic!("Not implemented");
+        }
+    }
+}
+
+impl Shl for UInt256 {
+    type Output = Self;
+
+    fn shl(self, shift: Self) -> Self {
+        // assert not shifting more than 256
+        assert_eq!(shift.high, 0);
+        assert!(shift.low < 256);
+        if shift.low > 128 {
+            UInt256 {
+                low: 0,
+                high: self.low << (shift.low - 128),
+            }
+        } else {
+            // This case is more complicated.
             panic!("Not implemented");
         }
     }
@@ -163,11 +182,7 @@ impl UInt256 {
 
 impl fmt::Debug for UInt256 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.high == 0 {
-            write!(f, "0x{:02X}", self.low)
-        } else {
-            write!(f, "0x{:X}{:02X}", self.high, self.low)
-        }
+        write!(f, "{}", self)
     }
 }
 
@@ -176,7 +191,7 @@ impl fmt::Display for UInt256 {
         if self.high == 0 {
             write!(f, "0x{:02X}", self.low)
         } else {
-            write!(f, "0x{:X}{:02X}", self.high, self.low)
+            write!(f, "0x{:X}{:032X}", self.high, self.low)
         }
     }
 }

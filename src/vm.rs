@@ -165,42 +165,62 @@ impl Task<'_> {
         print_instruction(instruction, arg_option);
         match *instruction {
             OP_ADD => {
-                let result = stack.pop()? + stack.pop()?;
+                let a = stack.pop()?;
+                let b = stack.pop()?;
+                let result = a + b;
+                println!("ADD: {} + {} -> {}", a, b, result);
                 stack.push(result);
             }
             OP_SUB => {
-                let result = stack.pop()? - stack.pop()?;
+                let a = stack.pop()?;
+                let b = stack.pop()?;
+                let result = a - b;
+                println!("SUB: {} - {} -> {}", a, b, result);
                 stack.push(result);
             }
             OP_LT => {
-                let result = stack.pop()? < stack.pop()?;
+                let a = stack.pop()?;
+                let b = stack.pop()?;
+                let result = a < b;
+                println!("LT: {} < {} -> {}", a, b, result);
                 stack.push(UInt256::from_bool(result));
             }
             OP_GT => {
-                let result = stack.pop()? > stack.pop()?;
+                let a = stack.pop()?;
+                let b = stack.pop()?;
+                let result = a > b;
+                println!("GT: {} > {} -> {}", a, b, result);
                 stack.push(UInt256::from_bool(result));
             }
             OP_EQ => {
                 let a = stack.pop()?;
                 let b = stack.pop()?;
-                println!("EQ -> {} {}", a, b);
-                stack.push(UInt256::from_bool(a == b));
+                let result = a == b;
+                println!("EQ: {} == {} -> {}", a, b, result);
+                stack.push(UInt256::from_bool(result));
             }
             OP_NOT => {
                 let a = stack.pop()?;
                 stack.push(!a);
             }
+            OP_SHL => {
+                let shift = stack.pop()?;
+                let value = stack.pop()?;
+                let result = value << shift;
+                println!("SHL: {} << {} -> {}", value, shift, result);
+                stack.push(result);
+            }
             OP_SHR => {
                 let shift = stack.pop()?;
                 let value = stack.pop()?;
                 let result = value >> shift;
-                println!("SHR {} >> {} = {}", value, shift, result);
+                println!("SHR: {} >> {} -> {}", value, shift, result);
                 stack.push(result);
             }
             OP_MLOAD => {
                 let offset = stack.pop()?;
                 let value = self.memory.load(offset)?;
-                println!("MLOAD ({}) -> {}", offset, value);
+                println!("MLOAD: ({}) -> {}", offset, value);
                 stack.push(value);
             }
             OP_MSTORE => {
@@ -209,7 +229,7 @@ impl Task<'_> {
                 self.memory.store(offset, value)?;
             }
             OP_CALLVALUE => {
-                println!("CALLVALUE -> {}", self.message.value);
+                println!("CALLVALUE: -> {}", self.message.value);
                 stack.push(self.message.value);
             }
             OP_CALLDATASIZE => {
@@ -433,10 +453,23 @@ pub fn dissemble(input: &mut InputManager) -> Result<(), VMError> {
     Ok(())
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum ContractError {
     Revert(Vec<u8>),
     InternalError(VMError),
+}
+
+impl fmt::Debug for ContractError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ContractError::Revert(data) => {
+                write!(f, "Revert({:02X?})", data)
+            }
+            ContractError::InternalError(error) => {
+                write!(f, "InternalError({:?})", error)
+            }
+        }
+    }
 }
 
 pub fn send_message_to_contract(
