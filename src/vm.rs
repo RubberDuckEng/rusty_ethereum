@@ -541,3 +541,28 @@ pub fn send_message_to_contract(
         TaskResult::Stop => return Ok(()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::abi::*;
+    #[test]
+    fn iszero_works() {
+        let instruction = OP_ISZERO;
+        let arg_option = None;
+        let message = Message::default();
+        let mut task = Task {
+            message: &message,
+            stack: Stack {
+                values: vec![UInt256::ZERO],
+            },
+            memory: Memory::default(),
+            input: InputManager::from_bytes(vec![]),
+            storage: Storage::default(),
+        };
+        let result = task.execute_single_instruction(&instruction, arg_option);
+        assert!(result.is_ok());
+        assert_eq!(task.stack.peek(0).expect("ok"), UInt256::ONE);
+        assert_eq!(task.stack.values.len(), 1);
+    }
+}
