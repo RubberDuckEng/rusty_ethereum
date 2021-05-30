@@ -2,7 +2,7 @@ use itertools::Itertools;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::iter::Iterator;
-use std::ops::{Add, Shr, Sub};
+use std::ops::{Add, Not, Shr, Sub};
 
 #[derive(Default, Copy, Clone, PartialEq, PartialOrd, Eq)]
 pub struct UInt256 {
@@ -70,6 +70,17 @@ impl Sub for UInt256 {
         Self {
             low: self.low.checked_sub(other.low).expect("works"),
             high: 0,
+        }
+    }
+}
+
+impl Not for UInt256 {
+    type Output = Self;
+
+    fn not(self) -> Self {
+        Self {
+            low: !self.low,
+            high: !self.high,
         }
     }
 }
@@ -201,5 +212,14 @@ mod tests {
         let shift = UInt256::from_u128(0xE0);
         let expected = 0x6D4CE63C;
         assert_eq!(value >> shift, UInt256::from_u128(expected));
+    }
+    #[test]
+    fn not_works() {
+        let value = UInt256 { high: 1, low: 0 };
+        let expected = UInt256 {
+            high: u128::MAX - 1,
+            low: u128::MAX,
+        };
+        assert_eq!(!value, expected);
     }
 }

@@ -36,8 +36,8 @@ fn main_disassemble() {
 #[allow(dead_code)]
 fn main() {
     // main_disassemble();
-
-    let message = Message::new_call("get()");
+    let method_names = vec!["get()", "count()", "inc()", "dec()"];
+    let message = Message::new_call(method_names[2]);
     let filename = "bin/fixtures/Counter.bin";
     let contract = InputManager::from_file(&filename);
     match send_message_to_contract(message, contract) {

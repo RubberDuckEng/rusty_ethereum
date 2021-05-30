@@ -176,11 +176,19 @@ impl Task<'_> {
                 let result = stack.pop()? < stack.pop()?;
                 stack.push(UInt256::from_bool(result));
             }
+            OP_GT => {
+                let result = stack.pop()? > stack.pop()?;
+                stack.push(UInt256::from_bool(result));
+            }
             OP_EQ => {
                 let a = stack.pop()?;
                 let b = stack.pop()?;
                 println!("EQ -> {} {}", a, b);
                 stack.push(UInt256::from_bool(a == b));
+            }
+            OP_NOT => {
+                let a = stack.pop()?;
+                stack.push(!a);
             }
             OP_SHR => {
                 let shift = stack.pop()?;
@@ -231,6 +239,9 @@ impl Task<'_> {
             }
             OP_DUP2 => {
                 stack.push(stack.peek(1)?);
+            }
+            OP_DUP3 => {
+                stack.push(stack.peek(2)?);
             }
             OP_SWAP1 => {
                 stack.swap(0, 1)?;
