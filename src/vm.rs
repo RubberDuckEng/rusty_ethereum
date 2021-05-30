@@ -41,20 +41,30 @@ struct Stack {
 }
 
 impl Stack {
-    fn push(&mut self, value: UInt256) {
-        return self.values.push(value);
-    }
-
-    fn peek(&self, index: usize) -> Result<UInt256, VMError> {
+    fn from_top(&self, index: usize) -> Result<usize, VMError> {
         if index < self.values.len() {
-            Ok(self.values[self.values.len() - index - 1])
+            Ok(self.values.len() - index - 1)
         } else {
             Err(VMError::StackUnderflow)
         }
     }
 
+    fn push(&mut self, value: UInt256) {
+        return self.values.push(value);
+    }
+
+    fn peek(&self, index: usize) -> Result<UInt256, VMError> {
+        Ok(self.values[self.from_top(index)?])
+    }
+
     fn pop(&mut self) -> Result<UInt256, VMError> {
         return self.values.pop().ok_or(VMError::StackUnderflow);
+    }
+
+    fn swap(&mut self, a: usize, b: usize) -> Result<(), VMError> {
+        let a_usize = self.from_top(a)?;
+        let b_usize = self.from_top(b)?;
+        Ok(self.values.swap(a_usize, b_usize))
     }
 }
 
@@ -182,6 +192,7 @@ impl Task<'_> {
             OP_MLOAD => {
                 let offset = stack.pop()?;
                 let value = self.memory.load(offset)?;
+                println!("MLOAD ({}) -> {}", offset, value);
                 stack.push(value);
             }
             OP_MSTORE => {
@@ -222,10 +233,11 @@ impl Task<'_> {
                 stack.push(stack.peek(1)?);
             }
             OP_SWAP1 => {
-                stack.values.swap(0, 1);
+                stack.swap(0, 1)?;
+                println!("SWAP1 (old: {} new: {})", stack.peek(1)?, stack.peek(0)?);
             }
             OP_SWAP2 => {
-                stack.values.swap(0, 2);
+                stack.swap(0, 2)?;
             }
             OP_ISZERO => {
                 println!("ISZERO -> {}", stack.peek(0)? == UInt256::ZERO);
@@ -279,6 +291,7 @@ impl Task<'_> {
                 let offset = stack.pop()?;
                 let length = stack.pop()?;
                 let range = offset..offset + length;
+                println!("RETURN {}..{}", offset, offset + length);
                 return Ok(InstructionResult::Return(self.memory.copy_out(range)?));
             }
             OP_REVERT => {
