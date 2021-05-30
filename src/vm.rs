@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
+use std::iter::Iterator;
 use std::ops::Range;
 
 use crate::instructions::*;
+use crate::uint256::*;
 use crate::Message;
-use crate::UInt256;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum VMError {
@@ -138,13 +139,16 @@ impl Task<'_> {
                 stack.push(UInt256::from_bool(result));
             }
             OP_EQ => {
-                let result = stack.pop()? == stack.pop()?;
-                stack.push(UInt256::from_bool(result));
+                let a = stack.pop()?;
+                let b = stack.pop()?;
+                println!("EQ -> {} {}", a, b);
+                stack.push(UInt256::from_bool(a == b));
             }
             OP_SHR => {
                 let shift = stack.pop()?;
                 let value = stack.pop()?;
                 let result = value >> shift;
+                println!("SHR {} >> {} = {}", value, shift, result);
                 stack.push(result);
             }
             OP_MSTORE => {
@@ -293,6 +297,10 @@ impl ArgType {
 }
 
 impl InputManager {
+    pub fn from_string(contents: &String) -> InputManager {
+        InputManager::from_bytes(hex_string_as_vec_u8(contents))
+    }
+
     pub fn from_bytes(ops: Vec<u8>) -> InputManager {
         InputManager { ops, index: 0 }
     }

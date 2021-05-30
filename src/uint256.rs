@@ -1,12 +1,22 @@
-use std::fmt;
-
+use itertools::Itertools;
 use std::convert::{TryFrom, TryInto};
+use std::fmt;
+use std::iter::Iterator;
 use std::ops::{Add, Shr};
 
 #[derive(Default, Copy, Clone, PartialEq, PartialOrd, Eq)]
 pub struct UInt256 {
     high: u128,
     low: u128,
+}
+
+pub fn hex_string_as_vec_u8(hex: &str) -> Vec<u8> {
+    let chars = hex.chars();
+    let chunks = chars.chunks(2);
+    chunks
+        .into_iter()
+        .map(|chunk| u8::from_str_radix(&chunk.collect::<String>(), 16).expect("vaild hex"))
+        .collect::<Vec<u8>>()
 }
 
 impl UInt256 {
@@ -26,6 +36,10 @@ impl UInt256 {
             low: value,
             high: 0,
         }
+    }
+
+    pub fn from_string(hex: &str) -> UInt256 {
+        UInt256::from_be_slice(&hex_string_as_vec_u8(hex))
     }
 }
 
@@ -54,9 +68,10 @@ impl Shr for UInt256 {
         // Assume it does not module for now and cap at 256.
         assert!(shift.low < 256);
         if shift.low > 128 {
+            println!("{} >> {}", self.high, shift.low - 128);
             UInt256 {
                 high: 0,
-                low: self.high >> shift.low - 128,
+                low: self.high >> (shift.low - 128),
             }
         } else {
             // This case is more complicated:
@@ -103,10 +118,10 @@ fn u128_from_be_slice(bytes: &[u8]) -> u128 {
 
 impl UInt256 {
     pub fn from_be_slice(bytes: &[u8]) -> UInt256 {
-        if bytes.len() > 8 {
+        if bytes.len() > 16 {
             return UInt256 {
-                high: u128_from_be_slice(&bytes[8..]),
-                low: u128_from_be_slice(&bytes[..8]),
+                high: u128_from_be_slice(&bytes[..16]),
+                low: u128_from_be_slice(&bytes[16..]),
             };
         }
         return UInt256 {
@@ -118,6 +133,16 @@ impl UInt256 {
     pub fn to_be_bytes(&self, bytes: &mut [u8]) {
         bytes[..16].copy_from_slice(&self.high.to_be_bytes());
         bytes[16..].copy_from_slice(&self.low.to_be_bytes());
+    }
+}
+
+impl fmt::Debug for UInt256 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.high == 0 {
+            write!(f, "0x{:02X}", self.low)
+        } else {
+            write!(f, "0x{:X}{:02X}", self.high, self.low)
+        }
     }
 }
 
@@ -142,5 +167,25 @@ mod tests {
         let bigger = UInt256 { high: 2, low: 1 };
         let smaller = UInt256 { high: 1, low: 2 };
         assert!(bigger > smaller);
+    }
+    #[test]
+    fn from_string_works() {
+        let value = UInt256::from_string(
+            "6D4CE63C00000000000000000000000000000000000000000000000000000000",
+        );
+        let expected_high: u128 = 0x6D4CE63C << 96;
+        let expected_low = 0x00000000;
+        assert_eq!(value.low, expected_low);
+        assert_eq!(value.high, expected_high);
+    }
+    #[test]
+    fn shr_works() {
+        let value = UInt256 {
+            high: 0x6D4CE63C << 96,
+            low: 0,
+        };
+        let shift = UInt256::from_u128(0xE0);
+        let expected = 0x6D4CE63C;
+        assert_eq!(value >> shift, UInt256::from_u128(expected));
     }
 }
