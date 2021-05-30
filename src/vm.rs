@@ -71,6 +71,17 @@ impl Stack {
     }
 }
 
+impl fmt::Display for Stack {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut as_hex = Vec::new();
+        for word in &self.values {
+            as_hex.push(format!("{}", word));
+        }
+        as_hex.reverse();
+        write!(f, "{}", as_hex.join(","))
+    }
+}
+
 #[derive(Default)]
 struct Memory {
     bytes: Vec<u8>,
@@ -134,11 +145,13 @@ enum InstructionResult {
     Continue,
     Return(Vec<u8>),
     Revert(Vec<u8>),
+    Stop,
 }
 
 enum TaskResult {
     Return(Vec<u8>),
     Revert(Vec<u8>),
+    Stop,
 }
 
 impl Task<'_> {
@@ -157,6 +170,9 @@ impl Task<'_> {
         let stack = &mut self.stack;
         print_instruction(instruction, arg_option);
         match *instruction {
+            OP_STOP => {
+                return Ok(InstructionResult::Stop);
+            }
             OP_ADD => {
                 let a = stack.pop()?;
                 let b = stack.pop()?;
@@ -269,8 +285,9 @@ impl Task<'_> {
                 println!("SWAP2 (old: {} new: {})", stack.peek(2)?, stack.peek(0)?);
             }
             OP_ISZERO => {
-                println!("ISZERO -> {}", stack.peek(0)? == UInt256::ZERO);
-                if stack.peek(0)? == UInt256::ZERO {
+                let a = stack.pop()?;
+                println!("ISZERO -> {}", a == UInt256::ZERO);
+                if a == UInt256::ZERO {
                     stack.push(UInt256::ONE)
                 } else {
                     stack.push(UInt256::ZERO)
@@ -377,10 +394,14 @@ impl Task<'_> {
                     return Ok(TaskResult::Return(data));
                 }
                 InstructionResult::Continue => {
+                    println!("{}", self.stack);
                     loop_breaker += 1;
                     if loop_breaker > 100 {
                         panic!();
                     }
+                }
+                InstructionResult::Stop => {
+                    return Ok(TaskResult::Stop);
                 }
             }
         }
@@ -473,6 +494,7 @@ pub fn dissemble(input: &mut InputManager) -> Result<(), VMError> {
 pub enum ContractError {
     Revert(Vec<u8>),
     InternalError(VMError),
+    UnexpectedStop,
 }
 
 impl fmt::Debug for ContractError {
@@ -483,6 +505,9 @@ impl fmt::Debug for ContractError {
             }
             ContractError::InternalError(error) => {
                 write!(f, "InternalError({:?})", error)
+            }
+            ContractError::UnexpectedStop => {
+                write!(f, "UnexpectedStop")
             }
         }
     }
@@ -499,6 +524,7 @@ pub fn send_message_to_contract(
     {
         TaskResult::Revert(data) => return Err(ContractError::Revert(data)),
         TaskResult::Return(bytes) => bytes,
+        TaskResult::Stop => return Err(ContractError::UnexpectedStop),
     };
     println!("Got contract, executing!");
     let contract = InputManager::from_bytes(contract_bytes);
@@ -512,5 +538,6 @@ pub fn send_message_to_contract(
             println!("return Data: {:02X?}", data);
             return Ok(());
         }
+        TaskResult::Stop => return Ok(()),
     }
 }

@@ -11,6 +11,10 @@ pub struct UInt256 {
 }
 
 pub fn hex_string_as_vec_u8(hex: &str) -> Vec<u8> {
+    // NOTE: This does allow 0x0x which might be bad?
+    if hex.starts_with("0x") {
+        return hex_string_as_vec_u8(&hex[2..]);
+    }
     let chars = hex.chars();
     let chunks = chars.chunks(2);
     chunks
