@@ -5,6 +5,7 @@ use std::iter::Iterator;
 use std::ops::Range;
 
 use crate::instructions::*;
+use crate::storage::{Storage, StorageError};
 use crate::uint256::*;
 use crate::Message;
 
@@ -17,6 +18,7 @@ pub enum VMError {
     BadArg,
     OutOfBounds,
     TypeConversion,
+    StorageError(StorageError),
 }
 
 impl fmt::Debug for VMError {
@@ -29,6 +31,7 @@ impl fmt::Debug for VMError {
             VMError::OutOfBounds => write!(f, "OutOfBounds"),
             VMError::EndOfInstructions => write!(f, "END_OF_INSTRUCTIONS"),
             VMError::TypeConversion => write!(f, "TypeConversion"),
+            VMError::StorageError(e) => write!(f, "StorageError ({:?})", e),
         }
     }
 }
@@ -71,16 +74,6 @@ impl Stack {
 #[derive(Default)]
 struct Memory {
     bytes: Vec<u8>,
-}
-
-#[derive(Default)]
-struct Storage {}
-
-impl Storage {
-    fn load(&self, key: UInt256) -> UInt256 {
-        println!("Storage.load({}) not implemented, returning 0", key);
-        UInt256::ZERO
-    }
 }
 
 pub struct Task<'a> {
@@ -201,7 +194,9 @@ impl Task<'_> {
             }
             OP_NOT => {
                 let a = stack.pop()?;
-                stack.push(!a);
+                let result = !a;
+                println!("NOT: !{} -> {}", a, result);
+                stack.push(result);
             }
             OP_SHL => {
                 let shift = stack.pop()?;
@@ -220,7 +215,7 @@ impl Task<'_> {
             OP_MLOAD => {
                 let offset = stack.pop()?;
                 let value = self.memory.load(offset)?;
-                println!("MLOAD: ({}) -> {}", offset, value);
+                println!("MLOAD: {} -> {}", offset, value);
                 stack.push(value);
             }
             OP_MSTORE => {
@@ -233,13 +228,9 @@ impl Task<'_> {
                 stack.push(self.message.value);
             }
             OP_CALLDATASIZE => {
-                stack.push(
-                    self.message
-                        .data
-                        .len()
-                        .try_into()
-                        .map_err(|_| VMError::OutOfBounds)?,
-                );
+                let size = self.message.data.len();
+                println!("CALLDATASIZE: -> {}", size);
+                stack.push(size.try_into().map_err(|_| VMError::OutOfBounds)?);
             }
             OP_CALLDATALOAD => {
                 let offset = stack.pop()?;
@@ -251,17 +242,23 @@ impl Task<'_> {
                     .get(index..end)
                     .ok_or(VMError::BadAccess)?;
                 let word = UInt256::from_be_slice(slice);
-                println!("CALLDATALOAD (offset {}) -> {}", offset, word);
+                println!("CALLDATALOAD: {} -> {}", offset, word);
                 self.stack.push(word);
             }
             OP_DUP1 => {
-                stack.push(stack.peek(0)?);
+                let value = stack.peek(0)?;
+                println!("DUP1: -> {}", value);
+                stack.push(value);
             }
             OP_DUP2 => {
-                stack.push(stack.peek(1)?);
+                let value = stack.peek(1)?;
+                println!("DUP2: -> {}", value);
+                stack.push(value);
             }
             OP_DUP3 => {
-                stack.push(stack.peek(2)?);
+                let value = stack.peek(2)?;
+                println!("DUP3: -> {}", value);
+                stack.push(value);
             }
             OP_SWAP1 => {
                 stack.swap(0, 1)?;
@@ -269,6 +266,7 @@ impl Task<'_> {
             }
             OP_SWAP2 => {
                 stack.swap(0, 2)?;
+                println!("SWAP2 (old: {} new: {})", stack.peek(2)?, stack.peek(0)?);
             }
             OP_ISZERO => {
                 println!("ISZERO -> {}", stack.peek(0)? == UInt256::ZERO);
@@ -292,8 +290,19 @@ impl Task<'_> {
             }
             OP_SLOAD => {
                 let key = stack.pop()?;
-                let value = self.storage.load(key);
+                let value = self
+                    .storage
+                    .load(key)
+                    .map_err(|e| VMError::StorageError(e))?;
+                println!("SLOAD: {} -> {}", key, value);
                 stack.push(value);
+            }
+            OP_SSTORE => {
+                let key = stack.pop()?;
+                let value = stack.pop()?;
+                self.storage
+                    .store(key, value)
+                    .map_err(|e| VMError::StorageError(e))?;
             }
             OP_JUMP => {
                 let destination = stack.pop()?;
@@ -338,6 +347,7 @@ impl Task<'_> {
                 op: 0x60..=0x7F, ..
             } => {
                 let arg = arg_option.ok_or(VMError::BadArg)?;
+                // println!("{}: -> {}", instruction.name, arg);
                 stack.push(arg);
             }
             _ => {
@@ -355,6 +365,7 @@ impl Task<'_> {
             .iter()
             .map(|instruction| (instruction.op, instruction))
             .collect();
+        let mut loop_breaker = 0;
         while let Some(op) = self.input.take_op() {
             let inst = ops.get(&op).ok_or(VMError::BadOp(op))?;
             let arg_option = self.input.take_arg(inst.arg)?;
@@ -365,7 +376,12 @@ impl Task<'_> {
                 InstructionResult::Return(data) => {
                     return Ok(TaskResult::Return(data));
                 }
-                InstructionResult::Continue => {}
+                InstructionResult::Continue => {
+                    loop_breaker += 1;
+                    if loop_breaker > 100 {
+                        panic!();
+                    }
+                }
             }
         }
         Err(VMError::EndOfInstructions)

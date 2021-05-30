@@ -3,6 +3,7 @@ use std::fs;
 mod abi;
 mod instructions;
 mod remix_json;
+mod storage;
 mod uint256;
 mod vm;
 
@@ -37,7 +38,7 @@ fn main_disassemble() {
 fn main() {
     // main_disassemble();
     let method_names = vec!["get()", "count()", "inc()", "dec()"];
-    let message = Message::new_call(method_names[3]);
+    let message = Message::new_call(method_names[2]);
     let filename = "bin/fixtures/Counter.bin";
     let contract = InputManager::from_file(&filename);
     match send_message_to_contract(message, contract) {
